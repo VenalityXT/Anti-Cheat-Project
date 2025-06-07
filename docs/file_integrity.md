@@ -117,7 +117,7 @@ Prevented false negatives and ensured detection of any baseline tampering.
 
 ## Challenges and Lessons Learned
 
-- Proper cryptographic handling is critical—subtle errors in signature verification can invalidate security.  
+- Proper cryptographic handling is critical! subtle errors in signature verification can invalidate security.  
 - Balancing security with performance requires selective hashing and possibly incremental verification.  
 - Secure private key management is vital to prevent signature forgery.
 
