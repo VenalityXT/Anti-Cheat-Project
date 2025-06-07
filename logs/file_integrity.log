@@ -1,0 +1,126 @@
+2025-06-06 22:29:22,704 [INFO] File Integrity Initialized
+2025-06-06 22:30:46,357 [INFO] File Integrity Initialized
+2025-06-06 22:34:48,299 [INFO] File Integrity Initialized
+2025-06-06 22:34:48,300 [INFO] test
+2025-06-06 22:34:48,300 [INFO] test
+2025-06-06 22:34:48,397 [INFO] File integrity check completed
+2025-06-06 22:34:48,397 [INFO] Running file integrity check
+2025-06-06 22:34:55,553 [INFO] File Integrity Initialized
+2025-06-06 22:34:55,647 [INFO] File integrity check completed
+2025-06-06 22:34:55,647 [INFO] Running file integrity check
+2025-06-06 22:35:05,763 [INFO] File integrity check completed
+2025-06-06 22:35:05,763 [INFO] Running file integrity check
+2025-06-06 22:35:15,870 [INFO] File integrity check completed
+2025-06-06 22:35:15,870 [INFO] Running file integrity check
+2025-06-06 22:35:51,739 [INFO] File Integrity Initialized
+2025-06-06 22:35:51,739 [INFO] Running file integrity check
+2025-06-06 22:35:51,834 [INFO] File integrity check completed
+2025-06-06 22:38:32,464 [INFO] File Integrity Initialized
+2025-06-06 22:38:32,464 [INFO] Running file integrity check
+2025-06-06 22:38:32,564 [INFO] File integrity check completed
+2025-06-06 22:39:02,565 [INFO] Running file integrity check
+2025-06-06 22:39:02,668 [INFO] File integrity check completed
+2025-06-06 22:39:32,671 [INFO] Running file integrity check
+2025-06-06 22:39:32,778 [INFO] File integrity check completed
+2025-06-06 22:40:02,780 [INFO] Running file integrity check
+2025-06-06 22:40:02,884 [INFO] File integrity check completed
+2025-06-06 22:40:32,886 [INFO] Running file integrity check
+2025-06-06 22:40:32,983 [INFO] File integrity check completed
+2025-06-06 22:41:02,985 [INFO] Running file integrity check
+2025-06-06 22:41:03,088 [INFO] File integrity check completed
+2025-06-06 22:54:50,558 [INFO] File Integrity Initialized
+2025-06-06 22:54:50,569 [INFO] Loaded expected hashes from file.
+2025-06-06 22:54:50,569 [INFO] Running file integrity check...
+2025-06-06 22:54:50,662 [INFO] File integrity check passed. No changes detected.
+2025-06-06 22:55:20,664 [INFO] Running file integrity check...
+2025-06-06 22:55:20,766 [ERROR] Integrity violation detected!
+2025-06-06 22:55:20,766 [ERROR] Changed or new files: ['C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\gamee.exe']
+2025-06-06 22:55:20,766 [ERROR] Missing files: ['C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\game.exe']
+2025-06-06 22:55:20,766 [ERROR] Critical files altered or missing. Closing the game with PID: 1551...
+2025-06-06 22:55:23,771 [INFO] Game process 1551 terminated (simulated).
+2025-06-06 23:12:56,270 [INFO] File Integrity Initialized
+2025-06-06 23:12:56,271 [INFO] Loaded expected hashes from file.
+2025-06-06 23:12:56,271 [INFO] Running file integrity check...
+2025-06-06 23:12:56,378 [ERROR] Integrity violation detected!
+2025-06-06 23:12:56,378 [ERROR] Changed or new files: ['C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\behavior_analysis.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\config.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\file_integrity.log', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\file_integrity.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\hashes.json', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\kernel_access.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\main.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\memory_scanning.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\README.md', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\utils.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\logs\\anti_cheat.log', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\__pycache__\\utils.cpython-311.pyc']
+2025-06-06 23:12:56,378 [ERROR] Critical files altered or missing. Closing the game with PID: 1516...
+2025-06-06 23:12:59,379 [INFO] Game process 1516 terminated (simulated).
+2025-06-06 23:13:29,575 [INFO] File Integrity Initialized
+2025-06-06 23:13:29,575 [WARNING] No hashes.json file found. Assuming first run to create baseline.
+2025-06-06 23:13:29,575 [INFO] Creating baseline hashes...
+2025-06-06 23:13:29,676 [INFO] Saved hashes to file.
+2025-06-06 23:13:29,676 [INFO] Running file integrity check...
+2025-06-06 23:13:29,781 [ERROR] Integrity violation detected!
+2025-06-06 23:13:29,781 [ERROR] Changed or new files: ['C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\file_integrity.log', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\hashes.json']
+2025-06-06 23:13:29,781 [ERROR] Critical files altered or missing. Closing the game with PID: 2014...
+2025-06-06 23:13:32,782 [INFO] Game process 2014 terminated (simulated).
+2025-06-06 23:15:46,627 [INFO] File Integrity Initialized
+2025-06-06 23:15:46,627 [INFO] Loaded expected hashes from file.
+2025-06-06 23:15:46,627 [INFO] Running file integrity check...
+2025-06-06 23:15:46,723 [ERROR] Integrity violation detected!
+2025-06-06 23:15:46,723 [ERROR] Missing files: ['C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\behavior_analysis.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\config.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\file_integrity.log', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\file_integrity.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\kernel_access.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\main.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\memory_scanning.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\README.md', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\utils.py', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\logs\\anti_cheat.log', 'C:\\Users\\mguaj\\OneDrive\\Desktop\\MyFPSGame\\ClearSight\\__pycache__\\utils.cpython-311.pyc']
+2025-06-06 23:15:46,723 [ERROR] Critical files altered or missing. Closing the game with PID: 9274...
+2025-06-06 23:15:49,724 [INFO] Game process 9274 terminated (simulated).
+2025-06-06 23:15:54,117 [INFO] File Integrity Initialized
+2025-06-06 23:15:54,117 [WARNING] No hashes.json file found. Assuming first run to create baseline.
+2025-06-06 23:15:54,117 [INFO] Creating baseline hashes...
+2025-06-06 23:15:54,212 [INFO] Saved hashes to file.
+2025-06-06 23:15:54,212 [INFO] Running file integrity check...
+2025-06-06 23:15:54,304 [INFO] File integrity check passed. No changes detected.
+2025-06-06 23:16:24,305 [INFO] Running file integrity check...
+2025-06-06 23:16:24,407 [INFO] File integrity check passed. No changes detected.
+2025-06-06 23:26:13,050 [INFO] File Integrity Initialized
+2025-06-06 23:26:13,051 [WARNING] Hash signature file not found.
+2025-06-06 23:26:13,051 [ERROR] Critical files altered or missing. Closing the game with PID: 5072...
+2025-06-06 23:26:16,052 [INFO] Game process 5072 terminated (simulated).
+2025-06-06 23:26:34,646 [INFO] File Integrity Initialized
+2025-06-06 23:26:34,646 [WARNING] No hashes.json file found. Assuming first run to create baseline.
+2025-06-06 23:26:34,646 [INFO] Creating baseline hashes...
+2025-06-06 23:26:34,742 [INFO] Saved hashes to file.
+2025-06-06 23:26:34,744 [INFO] Saved hash signature.
+2025-06-06 23:26:34,744 [INFO] Running file integrity check...
+2025-06-06 23:26:34,837 [INFO] File integrity check passed. No changes detected.
+2025-06-06 23:27:04,838 [INFO] Running file integrity check...
+2025-06-06 23:27:04,937 [INFO] File integrity check passed. No changes detected.
+2025-06-06 23:27:34,938 [INFO] Running file integrity check...
+2025-06-06 23:27:35,036 [INFO] File integrity check passed. No changes detected.
+2025-06-06 23:28:05,037 [INFO] Running file integrity check...
+2025-06-06 23:28:05,138 [INFO] File integrity check passed. No changes detected.
+2025-06-06 23:28:35,141 [INFO] Running file integrity check...
+2025-06-06 23:28:35,240 [INFO] File integrity check passed. No changes detected.
+2025-06-07 00:10:35,616 [INFO] File Integrity Script Started
+2025-06-07 00:10:35,679 [ERROR] Digital signature verification failed: 
+2025-06-07 00:10:35,679 [ERROR] Digital signature verification failed — possible tampering detected!
+2025-06-07 00:12:58,884 [INFO] File Integrity Script Started
+2025-06-07 00:12:58,885 [WARNING] Baseline encrypted hashes file 'data/hashes.json.enc' not found. Assuming first run.
+2025-06-07 00:12:58,885 [INFO] Baseline hashes not found. Creating new baseline from current game files...
+2025-06-07 00:12:59,088 [INFO] Encrypted baseline hashes saved to 'data/hashes.json.enc'.
+2025-06-07 00:12:59,122 [INFO] Digital signature saved to 'data/hashes.json.sig'.
+2025-06-07 00:12:59,122 [INFO] Starting file integrity check cycle...
+2025-06-07 00:12:59,215 [INFO] File integrity check passed. No changes detected.
+2025-06-07 00:13:29,217 [INFO] Starting file integrity check cycle...
+2025-06-07 00:13:29,322 [INFO] File integrity check passed. No changes detected.
+2025-06-07 00:13:34,032 [INFO] File Integrity Script Started
+2025-06-07 00:13:34,071 [ERROR] Digital signature verification failed: 
+2025-06-07 00:13:34,071 [ERROR] Digital signature verification failed — possible tampering detected!
+2025-06-07 00:13:44,763 [INFO] File Integrity Script Started
+2025-06-07 00:13:44,763 [WARNING] Baseline encrypted hashes file 'data/hashes.json.enc' not found. Assuming first run.
+2025-06-07 00:13:44,763 [INFO] Baseline hashes not found. Creating new baseline from current game files...
+2025-06-07 00:13:44,889 [INFO] Encrypted baseline hashes saved to 'data/hashes.json.enc'.
+2025-06-07 00:13:44,918 [INFO] Digital signature saved to 'data/hashes.json.sig'.
+2025-06-07 00:13:44,918 [INFO] Starting file integrity check cycle...
+2025-06-07 00:13:45,010 [INFO] File integrity check passed. No changes detected.
+2025-06-07 00:13:48,964 [INFO] File Integrity Script Started
+2025-06-07 00:13:49,004 [ERROR] Digital signature verification failed: 
+2025-06-07 00:13:49,005 [ERROR] Digital signature verification failed — possible tampering detected!
+2025-06-07 00:15:31,746 [INFO] File Integrity Script Started
+2025-06-07 00:15:31,746 [WARNING] Baseline encrypted hashes file 'data/hashes.json.enc' not found. Assuming first run.
+2025-06-07 00:15:31,746 [INFO] Baseline hashes not found. Creating new baseline from current game files...
+2025-06-07 00:15:31,873 [INFO] Encrypted baseline hashes saved to 'data/hashes.json.enc'.
+2025-06-07 00:15:31,901 [INFO] Digital signature saved to 'data/hashes.json.sig'.
+2025-06-07 00:15:31,901 [INFO] Starting file integrity check cycle...
+2025-06-07 00:15:31,993 [INFO] File integrity check passed. No changes detected.
+2025-06-07 00:15:35,305 [INFO] File Integrity Script Started
+2025-06-07 00:15:35,345 [INFO] Baseline hashes loaded and verified successfully.
+2025-06-07 00:15:35,345 [INFO] Starting file integrity check cycle...
+2025-06-07 00:15:35,439 [INFO] File integrity check passed. No changes detected.
