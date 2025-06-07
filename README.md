@@ -28,22 +28,22 @@ A modular anti-cheat framework designed to detect and prevent common cheating te
 ### [File Integrity Checker](docs/file_integrity.md)  
 Detects unauthorized modifications to critical game files by comparing cryptographic hashes against a digitally signed baseline.
 
-### [Memory Scanner](docs/memory_scanner.md)  
+### [Memory Scanner](docs/memory_scanner.md) (Work In Progress) 
 Monitors system memory to detect suspicious patterns indicating code injection or memory tampering.
 
-### [Kernel Monitor](docs/kernel_monitor.md)  
+### [Kernel Monitor](docs/kernel_monitor.md) (Work In Progress) 
 Tracks kernel-level driver activity to identify unauthorized or malicious kernel modules.
 
-### [Process Watcher](docs/process_watcher.md)  
+### [Process Watcher](docs/process_watcher.md) (Work In Progress) 
 Watches running processes and flags blacklisted or anomalous behavior indicative of cheat tools.
 
-### [Input Logger Detector](docs/input_logger_detector.md)  
+### [Input Logger Detector](docs/input_logger_detector.md) (Work In Progress)  
 Detects unusual input patterns or injected inputs that may result from macros or keyloggers.
 
-### [Network Sniffer Blocker](docs/network_sniffer_blocker.md)  
+### [Network Sniffer Blocker](docs/network_sniffer_blocker.md) (Work In Progress)  
 Identifies network sniffing or man-in-the-middle tools that attempt to intercept game traffic.
 
-### [Behavior Analysis](docs/behavior_analysis.md)  
+### [Behavior Analysis](docs/behavior_analysis.md) (Work In Progress)  
 Analyzes player behavior data to detect aimbots, wallhacks, or other automated cheating strategies.
 
 ---
