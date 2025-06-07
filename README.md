@@ -1,4 +1,4 @@
-# Anti-Cheat-Project
+# ClearSight Anti Cheat 
 
 ### 🔐 File Integrity Module
 
