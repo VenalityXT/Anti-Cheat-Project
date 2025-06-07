@@ -1,6 +1,6 @@
 # Anti-Cheat System
 
-A modular anti-cheat framework designed to detect and prevent common cheating techniques in FPS-style games. This project is organized into multiple components, each focusing on a specific detection or prevention method.
+A modular anti-cheat framework designed to detect and prevent common cheating techniques in FPS-style games. Inspired by Valorant’s Vanguard system, this project is organized into multiple components, each focusing on a specific detection or prevention method.
 
 ---
 
