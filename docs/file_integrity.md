@@ -225,7 +225,7 @@ Before production:
 
 # Runtime Flow
 
-<img width="1766" height="1084" alt="image" src="https://github.com/user-attachments/assets/df7e2a2a-5a32-4803-8875-37fba56b35bd" />
+<img width="1770" height="1089" alt="image" src="https://github.com/user-attachments/assets/c011eaff-1c41-41b7-8da2-2c0cd24c7730" />
 
 ---
 
