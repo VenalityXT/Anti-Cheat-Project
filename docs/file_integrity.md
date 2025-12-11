@@ -43,8 +43,6 @@ Two independent baselines are maintained:
 
 Both baselines must be deleted if the folder structure or monitored files change during development.
 
-<img width="1766" height="1084" alt="image" src="https://github.com/user-attachments/assets/df7e2a2a-5a32-4803-8875-37fba56b35bd" />
-
 ---
 
 # Directory and Path Design
@@ -227,33 +225,7 @@ Before production:
 
 # Runtime Flow
 
-```
-Start
-↓
-Load RSA keys
-↓
-Derive AES key
-↓
-Verify self-integrity baseline
-↓
-Verify file-integrity baseline (or create new one)
-↓
-Scan directory, compute hashes
-↓
-Check honeyfile
-↓
-Check debugger status
-↓
-Compare live hashes to baseline
-↓
-If mismatch:
-- DEV_MODE → warning
-- Production → [FATAL] terminate
-↓
-Sleep (with jitter)
-↓
-Repeat
-```
+<img width="1766" height="1084" alt="image" src="https://github.com/user-attachments/assets/df7e2a2a-5a32-4803-8875-37fba56b35bd" />
 
 ---
 
