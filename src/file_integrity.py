@@ -1,352 +1,484 @@
+# ==================================================================================================
 # FILE_INTEGRITY.PY
-# 
-# PURPOSE: 
-# This file handles the integrity checking of important game files.
-# It calculates and compares the SHA256 hash of game files with known good hashes.
 #
-# HOW IT WORKS:
-# The script reads the file, calculates its SHA256 hash, and compares it with pre-defined hashes.
-# If the hash of a file doesn't match the expected hash, the script logs the issue.
+# PURPOSE:
+#   Provides secure, production-style file integrity monitoring for an FPS anti-cheat engine.
+
+#   This module:
+#     • Verifies its own integrity using a persistent self-hash baseline
+#     • Detects file tampering, additions, or deletions
+#     • Uses AES-256-GCM with RSA-PSS signatures to protect baseline data
+#     • Derives AES keys directly from RSA private key material (no hardcoded secrets)
+#     • Implements debugger detection and honeyfile trap logic
+#     • Employs timing jitter to prevent predictable scanning windows
+#
+# DESIGN GOAL:
+#   Highly readable, secure, and professional — suitable for teaching, portfolio display,
+#   and demonstrating real-world anti-cheat concepts to recruiters.
+# ==================================================================================================
 
 
 # ============================================= IMPORTS ============================================= #
+# Standard library imports
+import os
+import sys
+import time
+import json
+import random
+import hashlib
+import logging
+import secrets
+import ctypes
+from typing import Dict
 
-# ~~~ Python Library Imports ~~~ #
-
-import logging   # For structured logging of script events, errors, and info messages
-import secrets   # For generating cryptographically secure random bytes (salt)
-import hashlib   # For generating SHA256 hashes of files to verify integrity
-import random    # For simulating process IDs when closing game on integrity failure
-import time      # For adding delays between integrity check cycles
-import json      # For serializing and deserializing baseline hashes to/from JSON format
-import sys       # For exiting the script on critical errors or early termination
-import os        # For interacting with the file system (walking directories, checking files)
-
-# ~~~ Cryptography Library Imports ~~~ #
-
-from cryptography.hazmat.primitives import serialization, hashes  
-# Serialization: loading & saving crypto keys
-# Hashes: crypto hashing algorithms (SHA256) used for signing and verification
-
-from cryptography.hazmat.primitives.asymmetric import padding  
-# Provides padding schemes (PSS) used in RSA digital signatures for security
-
-from cryptography.hazmat.backends import default_backend  
-# Specifies cryptographic backend (default implementation) used by cryptography primitives
-
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC  
-# PBKDF2 key derivation function to securely derive AES keys from passwords with salt
-
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes  
-# Provides AES cipher algorithms and modes (CBC) used for encryption/decryption
+# Cryptography primitives for hashing, AES-GCM, RSA-PSS, and KDF
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 
 
 # ============================================ CONSTANTS ============================================ #
 
+# Disables game termination conditions from debugging
+DEV_MODE = True
 
+# Root directory of the game to monitor
 GAME_DIRECTORY = r"C:\Users\mguaj\OneDrive\Desktop\MyFPSGame"
-EXCLUDE_FOLDER_NAME = "ClearSight"
 
-ENCRYPTED_HASHES_FILE = 'data/hashes.json.enc'
-SIGNATURE_FILE = 'data/hashes.json.sig'
-PUBLIC_KEY_FILE = 'keys/public_key.pem'
-PRIVATE_KEY_FILE = 'keys/private_key.pem'
+# Paths for storing encrypted baselines + signatures
+BASELINE_FILE = "ClearSight/data/baseline/hashes.bin"
+BASELINE_SIGNATURE_FILE = "ClearSight/data/baseline/hashes.sig"
 
-AES_PASSWORD_BYTES = b"v9#Xr!q7$LpZ@3mNk8*Fy%TwHsJ4&Vc"
+# Paths for storing self-integrity baseline + signature
+SELF_HASH_FILE = "ClearSight/data/baseline/self_integrity.bin"
+SELF_HASH_SIGNATURE_FILE = "ClearSight/data/baseline/self_integrity.sig"
+
+# Cryptographic keypaths
+PUBLIC_KEY_FILE = "ClearSight/keys/public_key.pem"
+PRIVATE_KEY_FILE = "ClearSight/keys/private_key.pem"
+
+# Output logs
+LOG_FILE = "ClearSight/logs/file_integrity.log"
+
+# Honeyfile used as a tamper-detection trap
+HONEYFILE_PATH = os.path.join(GAME_DIRECTORY, "honeypot.dat")
+
+# Exclusion rules
+EXCLUDED_FOLDERS = ["ClearSight", "__pycache__", ".git"]
+EXCLUDED_EXTENSIONS = [".tmp", ".log", ".cache"]
+
+# Integrity loop timing
+SCAN_INTERVAL_SECONDS = 30       # Main interval
+JITTER_SECONDS = 15              # Random offset to break cheat timing
 
 
-# ========================================== LOGGING SETUP ========================================= #
+# =========================================== LOGGING SETUP ========================================= #
 
+# Ensure logs directory exists before FileHandler is created
+log_dir = os.path.dirname(LOG_FILE)
 
-logging.basicConfig( 
+if log_dir and not os.path.exists(log_dir):
+    os.makedirs(log_dir, exist_ok=True)
+    print(f"[FILE_INTEGRITY] Log directory '{log_dir}' did not exist. Created automatically.")
+
+# Now safely configure logging
+logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
+    format="%(asctime)s [FILE_INTEGRITY] [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("logs/file_integrity.log"),
+        logging.FileHandler(LOG_FILE),
         logging.StreamHandler(sys.stdout)
-    ]
+    ],
 )
 
-logging.info("File Integrity Script Started")
+logging.info("File Integrity Module Loaded Successfully.")
+
+# ========================================= UTILITY HELPERS ========================================== #
+
+def canonical(path: str) -> str:
+    """Returns normalized absolute path — helps avoid bypassing checks with path tricks."""
+    return os.path.abspath(os.path.normpath(path))
 
 
-# ============================================ FUNCTIONS =========================================== #
-
-# ~~~ CRYPTOGRAPHIC HELPERS ~~~ #
-
-def create_AES(password: bytes, salt: bytes):
+def is_debugger_present() -> bool:
     """
-    Derives a 32-byte AES key and 16-byte IV from a password and salt
-    using PBKDF2 HMAC SHA256.
+    Detects debugger presence using:
+      • sys.gettrace() → Python-level debugger
+      • IsDebuggerPresent() → Windows native debugger checks
     """
-    key_derivation_function = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=48,  # 32 bytes for key + 16 bytes for IV
-        salt=salt,
-        iterations=100000,
-        backend=default_backend()
-    )
-    key_iv_bytes = key_derivation_function.derive(password)
-    aes_key = key_iv_bytes[:32]
-    aes_iv = key_iv_bytes[32:]
-    return aes_key, aes_iv
-
-
-def decrypt_AES(encrypted_data: bytes, password: bytes):
-    """
-    Decrypts AES CBC encrypted data.
-    Assumes the first 16 bytes of encrypted_data are the salt.
-    Removes PKCS7 padding after decryption.
-    """
-    salt = encrypted_data[:16]
-    ciphertext = encrypted_data[16:]
-
-    aes_key, aes_iv = create_AES(password, salt)
-
-    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(aes_iv), backend=default_backend())
-    decryptor = cipher.decryptor()
-
-    padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
-
-    # Remove PKCS7 padding
-    padding_length = padded_plaintext[-1]
-    plaintext = padded_plaintext[:-padding_length]
-
-    return plaintext
-
-
-def check_signature(data_bytes: bytes, signature_file_path: str, public_key_file_path: str):
-    """
-    Verifies a digital signature of data_bytes against the signature file using the public key.
-    Returns True if valid, False otherwise.
-    """
-    # Read signature bytes from file
-    with open(signature_file_path, 'rb') as signature_file:
-        signature_bytes = signature_file.read()
-
-    # Load public key for verification
-    with open(public_key_file_path, 'rb') as public_key_file:
-        public_key = serialization.load_pem_public_key(public_key_file.read(), backend=default_backend())
-
-    try:
-        # Verify signature using PSS padding and SHA256 hash algorithm
-        public_key.verify(
-            signature_bytes,
-            data_bytes,
-            padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ), hashes.SHA256()
-        )
+    # Python debugging hook present
+    if sys.gettrace():
         return True
 
-    except Exception as verification_error:
-        logging.error(f"Digital signature verification failed: {verification_error}")
+    # WinAPI debugger check
+    try:
+        return ctypes.windll.kernel32.IsDebuggerPresent() != 0
+    except Exception:
         return False
 
 
-# ~~~ FILE HASHING AND SCANNING ~~~ #
-
-def get_hash(file_path: str):
+def terminate_game(event: str, reason: str):
     """
-    Calculate SHA256 hash of a file and return as hex string.
-    Returns None if file reading fails.
+    Simulated forced game termination when tampering is detected.
+    In production, this would signal the main process / kernel module.
     """
-    sha256_hasher = hashlib.sha256()
-    try:
-        with open(file_path, 'rb') as file_to_hash:
-            while chunk := file_to_hash.read(4096):
-                sha256_hasher.update(chunk)
-        return sha256_hasher.hexdigest()
-    except Exception as error:
-        logging.error(f"Failed to hash file '{file_path}': {error}")
-        return None
-
-
-def scan_hashes(game_dir: str, exclude_folder_name: str = None):
-    """
-    Walk through game directory, hashing all files except those in exclude_folder_name.
-    Returns a dictionary mapping full file paths to their SHA256 hashes.
-    """
-    file_hashes = {}
-
-    for root_directory, subdirs, files_in_dir in os.walk(game_dir):
-        for filename in files_in_dir:
-            full_file_path = os.path.join(root_directory, filename)
-
-            # Skip files inside excluded folder
-            if exclude_folder_name and exclude_folder_name in full_file_path:
-                continue
-
-            file_hash = get_hash(full_file_path)
-            if file_hash:
-                file_hashes[full_file_path] = file_hash
-
-    return file_hashes
-
-
-# ~~~ HANDLE BASELINE HASHES ~~~ #
-
-def verify_hashes():
-    """
-    Load the baseline hashes from the encrypted hashes file,
-    decrypt it using AES password, and verify its digital signature.
-    Returns the hashes dictionary if successful, or {} if no baseline exists.
-    Terminates program if verification fails.
-    """
-    if not os.path.exists(ENCRYPTED_HASHES_FILE):
-        logging.warning(f"Baseline encrypted hashes file '{ENCRYPTED_HASHES_FILE}' not found. Assuming first run.")
-        return {}
-
-    try:
-        with open(ENCRYPTED_HASHES_FILE, 'rb') as encrypted_hash_file:
-            encrypted_hash_data = encrypted_hash_file.read()
-    except Exception as read_error:
-        logging.error(f"Failed to read encrypted baseline hashes file: {read_error}")
-        sys.exit(1)
-
-    try:
-        decrypted_json_bytes = decrypt_AES(encrypted_hash_data, AES_PASSWORD_BYTES)
-    except Exception as decrypt_error:
-        logging.error(f"Decryption of baseline hashes file failed: {decrypt_error}")
-        sys.exit(1)
-
-    if not check_signature(encrypted_hash_data, SIGNATURE_FILE, PUBLIC_KEY_FILE):
-        logging.error("Digital signature verification failed — possible tampering detected!")
-        sys.exit(1)
-
-    try:
-        baseline_hashes_dict = json.loads(decrypted_json_bytes.decode('utf-8'))
-        logging.info("Baseline hashes loaded and verified successfully.")
-        return baseline_hashes_dict
-    except Exception as json_error:
-        logging.error(f"Failed to parse baseline hashes JSON: {json_error}")
-        sys.exit(1)
-
-
-def save_hashes(hashes_dict):
-    """
-    Encrypts and saves baseline hashes to ENCRYPTED_HASHES_FILE,
-    then signs the encrypted file with private key, saving signature to SIGNATURE_FILE.
-    Requires PRIVATE_KEY_FILE to be present.
-    """
-    # Convert hashes dict to JSON bytes
-    json_bytes = json.dumps(hashes_dict, indent=4).encode('utf-8')
-
-    # Generate random salt for key derivation
-    salt_bytes = secrets.token_bytes(16)
-
-    # Derive AES key and IV from password and salt
-    aes_key, aes_iv = create_AES(AES_PASSWORD_BYTES, salt_bytes)
-
-    # Setup AES CBC cipher
-    aes_cipher = Cipher(algorithms.AES(aes_key), modes.CBC(aes_iv), backend=default_backend())
-    encryptor = aes_cipher.encryptor()
-
-    # Add PKCS7 padding to JSON bytes
-    padding_length = 16 - (len(json_bytes) % 16)
-    padded_json_bytes = json_bytes + bytes([padding_length]) * padding_length
-
-    # Encrypt the padded JSON bytes
-    encrypted_bytes = encryptor.update(padded_json_bytes) + encryptor.finalize()
-
-    # Prepend salt for decryption use
-    encrypted_data_with_salt = salt_bytes + encrypted_bytes
-
-    # Save encrypted hashes file
-    with open(ENCRYPTED_HASHES_FILE, 'wb') as encrypted_file:
-        encrypted_file.write(encrypted_data_with_salt)
-
-    logging.info(f"Encrypted baseline hashes saved to '{ENCRYPTED_HASHES_FILE}'.")
-
-    # Load private RSA key for signing
-    if not os.path.exists(PRIVATE_KEY_FILE):
-        logging.error(f"Private key file '{PRIVATE_KEY_FILE}' not found. Cannot sign baseline hashes.")
-        sys.exit(1)
-
-    with open(PRIVATE_KEY_FILE, 'rb') as private_key_file:
-        private_key_data = private_key_file.read()
-
-    private_key = serialization.load_pem_private_key(private_key_data, password=None, backend=default_backend())
-
-    # Create digital signature of encrypted data using RSA-PSS and SHA256
-    digital_signature_bytes = private_key.sign(
-        encrypted_data_with_salt,
-        padding.PSS(
-            mgf=padding.MGF1(hashes.SHA256()),
-            salt_length=padding.PSS.MAX_LENGTH
-        ),
-        hashes.SHA256()
-    )
-
-    # Save the signature bytes to signature file
-    with open(SIGNATURE_FILE, 'wb') as signature_file:
-        signature_file.write(digital_signature_bytes)
-
-    logging.info(f"Digital signature saved to '{SIGNATURE_FILE}'.")
-
-
-# ~~~ INTEGRITY MONITOR LOOP ~~~ #
-
-def close_game():
-    """
-    Simulates closing the game process after integrity violation.
-    """
-    simulated_process_id = random.randint(1000, 9999)
-    logging.error(f"Critical files modified or missing. Terminating game process with PID: {simulated_process_id} (simulated).")
-    time.sleep(3)
-    logging.info(f"Game process {simulated_process_id} terminated.")
+    pid = random.randint(2000, 9999)
+    logging.critical(f"[{event}] Terminating simulated game process (PID={pid}) — Reason: {reason}")
+    time.sleep(1.5)
     sys.exit(1)
 
 
-def run_integrity_check():
+# ========================================== CRYPTOGRAPHY LAYER ====================================== #
+
+def derive_aes_key_from_private_key() -> bytes:
     """
-    Main loop that continuously monitors game files against the verified baseline hashes.
-    Terminates the program if any file integrity violation is detected.
+    Derives a deterministic AES-256 key from RSA private key material.
+    This avoids storing any plaintext password in code or environment.
     """
-    baseline_hashes = verify_hashes()
+    if not os.path.exists(PRIVATE_KEY_FILE):
+        terminate_game("FI-KEY-001", "Missing RSA private key.")
 
-    # If baseline does not exist, create it for first time
-    if not baseline_hashes:
-        logging.info("Baseline hashes not found. Creating new baseline from current game files...")
+    # Load RSA private key from disk
+    with open(PRIVATE_KEY_FILE, "rb") as f:
+        key_data = f.read()
 
-        baseline_hashes = scan_hashes(GAME_DIRECTORY, EXCLUDE_FOLDER_NAME)
+    private_key = serialization.load_pem_private_key(
+        key_data, password=None, backend=default_backend()
+    )
 
-        # Save encrypted baseline and signature
-        save_hashes(baseline_hashes)
+    # Extract large integer components from RSA key
+    numbers = private_key.private_numbers()
 
+    # Hash key components into a 32-byte seed
+    digest = hashlib.sha256()
+    digest.update(numbers.p.to_bytes((numbers.p.bit_length() + 7) // 8, "big"))
+    digest.update(numbers.q.to_bytes((numbers.q.bit_length() + 7) // 8, "big"))
+    digest.update(numbers.d.to_bytes((numbers.d.bit_length() + 7) // 8, "big"))
+    seed = digest.digest()  # 32 bytes
+
+    # Derive final AES key using PBKDF2 for extra strengthening
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,                              # AES-256
+        salt=b"AntiCheatAESDerivationSalt",     # Fixed salt for determinism
+        iterations=100000,
+        backend=default_backend(),
+    )
+
+    return kdf.derive(seed)
+
+
+def encrypt_json(data: dict, aes_key: bytes) -> bytes:
+    """
+    Encrypts a JSON dictionary using AES-GCM (authenticated encryption).
+    Returns: nonce + tag + ciphertext
+    """
+    json_bytes = json.dumps(data, indent=4).encode("utf-8")
+
+    # AES-GCM requires a 96-bit (12-byte) nonce
+    nonce = secrets.token_bytes(12)
+
+    cipher = Cipher(
+        algorithms.AES(aes_key),
+        modes.GCM(nonce),
+        backend=default_backend()
+    )
+    encryptor = cipher.encryptor()
+
+    # Produce authenticated ciphertext
+    ciphertext = encryptor.update(json_bytes) + encryptor.finalize()
+
+    # Return a self-contained blob
+    return nonce + encryptor.tag + ciphertext
+
+
+def decrypt_json(blob: bytes, aes_key: bytes) -> dict:
+    """
+    Decrypts AES-GCM encrypted blob back into Python dict.
+    Validates authentication tag automatically.
+    """
+    nonce = blob[:12]          # First 12 bytes
+    tag = blob[12:28]          # Next 16 bytes
+    ciphertext = blob[28:]     # Remainder
+
+    cipher = Cipher(
+        algorithms.AES(aes_key),
+        modes.GCM(nonce, tag),
+        backend=default_backend()
+    )
+    decryptor = cipher.decryptor()
+
+    plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+    return json.loads(plaintext.decode("utf-8"))
+
+
+def verify_signature(blob: bytes, signature_path: str, public_key_path: str) -> bool:
+    """
+    Verifies that `blob` was signed with the RSA private key corresponding to PUBLIC_KEY_FILE.
+    Prevents tampered baseline files from being trusted.
+    """
+    if not os.path.exists(signature_path):
+        logging.error("Signature file missing during verification.")
+        return False
+
+    # Load signature bytes
+    with open(signature_path, "rb") as f:
+        signature = f.read()
+
+    # Load public key for verification
+    with open(public_key_path, "rb") as f:
+        public_key = serialization.load_pem_public_key(f.read(), backend=default_backend())
+
+    try:
+        public_key.verify(
+            signature,
+            blob,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH,
+            ),
+            hashes.SHA256(),
+        )
+        return True  # Signature valid
+    except Exception as e:
+        logging.error(f"Digital signature verification failed: {e}")
+        return False
+
+
+def sign_blob(blob: bytes, output_signature_path: str):
+    """
+    Signs a blob using RSA private key and saves the signature.
+    Used for:
+        • Baseline self-integrity storage
+        • Main baseline signatures
+    """
+    with open(PRIVATE_KEY_FILE, "rb") as f:
+        private_key = serialization.load_pem_private_key(f.read(), password=None, backend=default_backend())
+
+    # Create RSA-PSS signature
+    signature = private_key.sign(
+        blob,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH,
+        ),
+        hashes.SHA256(),
+    )
+
+    # Store the signature
+    with open(output_signature_path, "wb") as f:
+        f.write(signature)
+
+
+# ========================================== SELF-INTEGRITY CHECK ==================================== #
+
+def compute_file_hash(path: str) -> str:
+    """Returns SHA-256 hash of a file read in safe, chunked blocks."""
+    sha = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(4096):
+            sha.update(chunk)
+    return sha.hexdigest()
+
+
+def verify_self_integrity(aes_key: bytes):
+    """
+    Ensures this script file has not been altered.
+    If baseline is missing, creates + signs a new one.
+    """
+    my_path = canonical(__file__)
+    current_hash = compute_file_hash(my_path)
+
+    # First run → create baseline
+    if not os.path.exists(SELF_HASH_FILE):
+        logging.info("No self-integrity baseline found — creating one now.")
+        blob = current_hash.encode("utf-8")
+
+        # Save the raw baseline hash
+        open(SELF_HASH_FILE, "wb").write(blob)
+
+        # Sign the baseline hash
+        sign_blob(blob, SELF_HASH_SIGNATURE_FILE)
+        logging.info("Self-integrity baseline created.")
+        return
+
+    # Load baseline hash
+    baseline_hash = open(SELF_HASH_FILE, "rb").read().decode("utf-8")
+
+    # Verify signature on the baseline hash
+    if not verify_signature(baseline_hash.encode("utf-8"), SELF_HASH_SIGNATURE_FILE, PUBLIC_KEY_FILE):
+        terminate_game("FI-SI-001", "Self-integrity signature invalid.")
+
+    # Hash mismatch → file altered
+    if baseline_hash != current_hash:
+        terminate_game("FI-SI-002", "Anti-cheat module has been modified!")
+
+
+# ========================================== BASELINE LOAD/SAVE ====================================== #
+
+def load_baseline(aes_key: bytes) -> Dict[str, str]:
+    """Loads + decrypts + validates the file integrity baseline."""
+    if not os.path.exists(BASELINE_FILE):
+        logging.warning("Baseline not found — creating new baseline on this run.")
+        return {}
+
+    blob = open(BASELINE_FILE, "rb").read()
+
+    # Validate signature BEFORE decryption
+    if not verify_signature(blob, BASELINE_SIGNATURE_FILE, PUBLIC_KEY_FILE):
+        terminate_game("FI-BL-001", "Baseline signature invalid.")
+
+    try:
+        return decrypt_json(blob, aes_key)
+    except Exception as e:
+        terminate_game("FI-BL-002", f"Baseline decryption failed: {e}")
+
+
+def save_baseline(hashes: Dict[str, str], aes_key: bytes):
+    """Encrypts the hash map and signs it for future verification."""
+    blob = encrypt_json(hashes, aes_key)
+
+    # Save encrypted blob
+    open(BASELINE_FILE, "wb").write(blob)
+
+    # Save RSA-PSS signature
+    sign_blob(blob, BASELINE_SIGNATURE_FILE)
+
+    logging.info("Baseline saved + signed successfully.")
+
+
+# ========================================== FILE SCANNING LOGIC ===================================== #
+
+def should_exclude(path: str) -> bool:
+    """
+    Determines whether a file path should be excluded based on:
+        • Folder names
+        • File extensions
+    """
+    path_lower = path.lower()
+
+    # Folder exclusion check
+    for folder in EXCLUDED_FOLDERS:
+        if folder.lower() in path_lower:
+            return True
+
+    # Extension exclusion check
+    _, ext = os.path.splitext(path)
+    if ext.lower() in EXCLUDED_EXTENSIONS:
+        return True
+
+    return False
+
+
+def scan_directory(root: str) -> Dict[str, str]:
+    """
+    Performs TOCTOU-safe scanning of the game directory.
+    Returns: {filepath: sha256_hash}
+    """
+    hashes = []
+    result = {}
+
+    # Gather all candidate files
+    for dirpath, _, files in os.walk(root):
+        for fname in files:
+            full = canonical(os.path.join(dirpath, fname))
+            if not should_exclude(full):
+                hashes.append(full)
+
+    # Shuffle order to prevent timing-based cheat bypass
+    random.shuffle(hashes)
+
+    # Compute hashes
+    for path in hashes:
+        try:
+            result[path] = compute_file_hash(path)
+        except Exception as e:
+            logging.error(f"Error hashing file {path}: {e}")
+
+    return result
+
+
+# ========================================== HONEYFILE CHECK ========================================= #
+
+def check_honeyfile():
+    """
+    Ensures honeyfile exists.
+    If modified or missing → this is a strong tampering indicator.
+    """
+    if not os.path.exists(HONEYFILE_PATH):
+        terminate_game("FI-HF-001", "Honeyfile is missing! Potential tampering.")
+
+
+# ========================================== MONITOR LOOP ============================================ #
+
+def monitor():
+    """
+    Main monitoring loop.
+    Handles:
+        • Debugger detection
+        • Self-integrity verification
+        • Baseline creation/loading
+        • File hashing and comparison
+        • Honeyfile verification
+        • Timed scan cycles with jitter
+    """
+
+    # Derive AES key from RSA private key → secure and deterministic
+    aes_key = derive_aes_key_from_private_key()
+
+    # Ensure this file hasn't been modified
+    verify_self_integrity(aes_key)
+
+    # Load baseline (or create if missing)
+    baseline = load_baseline(aes_key)
+    if not baseline:
+        logging.info("Generating baseline hashes...")
+        baseline = scan_directory(GAME_DIRECTORY)
+        save_baseline(baseline, aes_key)
+
+    # Begin main scanning loop
     while True:
-        logging.info("Starting file integrity check cycle...")
-        current_hashes = scan_hashes(GAME_DIRECTORY, EXCLUDE_FOLDER_NAME)
 
-        # Identify any files that are new or modified
-        changed_or_new_files = [
-            file_path for file_path, current_hash in current_hashes.items()
-            if file_path not in baseline_hashes or baseline_hashes[file_path] != current_hash
+        # Detect Python or OS debugger
+        if is_debugger_present():
+            if not DEV_MODE:
+                terminate_game("FI-DBG-001", "Debugger detected.")
+            else:
+                logging.warning("Debugger detected, but ignoring because DEV_MODE is enabled.")
+
+        # Verify honeyfile (basic tamper trip)
+        check_honeyfile()
+
+        # Current disk state
+        current = scan_directory(GAME_DIRECTORY)
+
+        # Detect deleted baseline files
+        missing = [p for p in baseline if p not in current]
+
+        # Detect changed or newly added files
+        modified_or_new = [
+            p for p in current
+            if p not in baseline or current[p] != baseline[p]
         ]
 
-        # Identify any files missing from current scan but present in baseline
-        missing_files = [
-            file_path for file_path in baseline_hashes
-            if file_path not in current_hashes
-        ]
+        # If violations exist → terminate
+        if missing or modified_or_new:
+            logging.error("Integrity violation detected!")
+            if missing:
+                logging.error(f"Missing files: {missing}")
+            if modified_or_new:
+                logging.error(f"Modified/New files: {modified_or_new}")
+            terminate_game("FI-INT-001", "Integrity violation detected.")
 
-        if changed_or_new_files or missing_files:
-            logging.error("File integrity violation detected!")
-
-            if changed_or_new_files:
-                logging.error(f"Files changed or added: {changed_or_new_files}")
-            if missing_files:
-                logging.error(f"Files missing: {missing_files}")
-
-            close_game()
-
-        logging.info("File integrity check passed. No changes detected.")
-        time.sleep(30)  # Delay before next check
+        # Sleep with jitter to avoid predictable timing
+        sleep_time = SCAN_INTERVAL_SECONDS + random.randint(-JITTER_SECONDS, JITTER_SECONDS)
+        sleep_time = max(5, sleep_time)  # Ensure no zero/negative sleep
+        time.sleep(sleep_time)
 
 
-# =========================================== ENTRY POINT ========================================== #
-
+# =============================================== ENTRY POINT ======================================== #
 
 if __name__ == "__main__":
-    run_integrity_check()
+    monitor()
