@@ -43,6 +43,8 @@ Two independent baselines are maintained:
 
 Both baselines must be deleted if the folder structure or monitored files change during development.
 
+![Untitled Diagram drawio](https://github.com/user-attachments/assets/3d1bc7e2-46f1-4023-9f53-0153a3e682a8)
+
 ---
 
 # Directory and Path Design
