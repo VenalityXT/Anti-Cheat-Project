@@ -1,13 +1,15 @@
 # Memory Monitor Module (`memory_monitor.py`)
 
 A system memory monitoring module within the ClearSight Anti-Cheat framework.  
-This module monitors system memory for suspicious patterns, detecting potential code injections or memory tampering attempts.
+This module monitors system memory for suspicious patterns, detecting potential code injections or memory tampering attempts. You can view the code [here](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/memory_monitor.py).
 
-[View script](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/memory_monitor.py)
+> [!IMPORTANT]
+> This module is designed for **controlled lab and research environments**.  
+> **Code obfuscation** and **anti-reversing measures** are intentionally **not implemented** to maintain **observability**, **testability**, and **debuggability** for research and detection validation.
 
 ---
 
-# Overview  
+## Overview  
 
 The Memory Monitor performs the following functions:
 
@@ -21,7 +23,7 @@ When a validated memory tampering event is detected, the module triggers a simul
 
 ---
 
-# Memory Monitoring Architecture
+## Memory Monitoring Architecture
 
 The Memory Monitor uses `psutil` to iterate through running processes, checking their memory regions for unusual executable permissions that may indicate malicious code injection.
 
@@ -40,7 +42,7 @@ The Memory Monitor uses `psutil` to iterate through running processes, checking 
 
 ---
 
-# Memory Monitoring Process
+## Memory Monitoring Process
 
 The module works as follows:
 
@@ -57,7 +59,7 @@ The module works as follows:
 
 ---
 
-# Memory Scan Error Handling
+## Memory Scan Error Handling
 
 In case of any error during memory scanning (e.g., access-denied errors, missing process), the module will:
 
@@ -71,7 +73,7 @@ In case of any error during memory scanning (e.g., access-denied errors, missing
 
 ---
 
-# Logging System
+## Logging System
 
 The module uses four severity levels:
 
@@ -92,7 +94,7 @@ If the `logs/` directory does not exist, it is automatically created.
 
 ---
 
-# Integrity Violation Codes
+## Integrity Violation Codes
 
 The module uses standardized event codes:
 
@@ -104,7 +106,7 @@ The module uses standardized event codes:
 
 ---
 
-# Development Workflow
+## Development Workflow
 
 During development:
 
@@ -121,13 +123,13 @@ Before production:
 
 ---
 
-# Runtime Flow
+## Runtime Flow
 
 <img width="2039" height="862" alt="image" src="https://github.com/user-attachments/assets/94977ecb-7532-4eb2-a794-4fe5bba35a9d" />
 
 ---
 
-# Summary
+## Summary
 
 The Memory Monitor forms a critical part of the ClearSight Anti-Cheat system by providing:
 
