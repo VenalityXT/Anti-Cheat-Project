@@ -3,6 +3,8 @@
 A system memory monitoring module within the ClearSight Anti-Cheat framework.  
 This module monitors system memory for suspicious patterns, detecting potential code injections or memory tampering attempts.
 
+[View script](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/memory_monitor.py)
+
 ---
 
 # Overview  
