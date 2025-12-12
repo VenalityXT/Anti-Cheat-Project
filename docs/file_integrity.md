@@ -3,6 +3,8 @@
 A cryptographically secure anti-tamper subsystem within the ClearSight Anti-Cheat framework.  
 This module enforces file integrity verification, self-integrity protection, baseline hashing, and tamper-aware termination logic.
 
+[Click to view script](src/file_integrity.py)
+
 ---
 
 # Overview  
