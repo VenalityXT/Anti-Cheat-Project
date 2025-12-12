@@ -1,7 +1,6 @@
 # Memory Monitor Module (`memory_monitor.py`)
 
-A system memory monitoring module within the ClearSight Anti-Cheat framework.  
-This module monitors system memory for suspicious patterns, detecting potential code injections or memory tampering attempts. You can view the code [here](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/memory_monitor.py).
+A system memory monitoring module within the ClearSight Anti-Cheat framework. This module monitors system memory for suspicious patterns, detecting potential code injections or memory tampering attempts. You can view the code [here](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/memory_monitor.py).
 
 > [!IMPORTANT]
 > This module is designed for **controlled lab and research environments**.  
