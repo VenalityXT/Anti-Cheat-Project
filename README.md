@@ -28,7 +28,7 @@ A modular anti-cheat framework designed to detect and prevent common cheating te
 ### [File Integrity Checker](docs/file_integrity.md)  
 Detects unauthorized modifications to critical game files by comparing cryptographic hashes against a digitally signed baseline.
 
-### [Memory Monitor](docs/memory_monitor.md) (Work In Progress) 
+### [Memory Monitor](docs/memory_monitor.md)
 Monitors system memory to detect suspicious patterns indicating code injection or memory tampering.
 
 ### [Kernel Monitor](docs/kernel_monitor.md) (Work In Progress) 
