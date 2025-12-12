@@ -1,8 +1,6 @@
 # File Integrity Module (`file_integrity.py`)
 
-A cryptographically secure anti-tamper subsystem within the ClearSight Anti-Cheat framework, enforcing file integrity verification, self-integrity protection, baseline hashing, and tamper-aware termination logic.
-
-[View Script](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/file_integrity.py)
+A cryptographically secure anti-tamper subsystem within the ClearSight Anti-Cheat framework, enforcing file integrity verification, self-integrity protection, baseline hashing, and tamper-aware termination logic. You can view the code [here](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/file_integrity.py).
 
 > [!IMPORTANT]
 > This module is designed for **controlled lab and research environments**.  
