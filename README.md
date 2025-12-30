@@ -1,7 +1,6 @@
 <div align="center">
-
-<img width="1563" height="1563" alt="Sentinel Guard" src="https://github.com/user-attachments/assets/944f4c36-9a2d-4f1d-97a9-b767029ece47" />
-
+    
+<img width="879" height="614" alt="Sentinel" src="https://github.com/user-attachments/assets/115f8c77-bffa-457b-8a56-bd2aaff4c52d" />
 
 ---
 
