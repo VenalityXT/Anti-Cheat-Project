@@ -62,6 +62,6 @@ Refer to the documentation for each component to understand setup requirements a
 
 ---
 
-## 🔐 License
+## License
 
-This project is licensed under the [GNU GPLv3 License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
