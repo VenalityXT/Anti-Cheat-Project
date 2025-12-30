@@ -1,4 +1,5 @@
 # Anti-Cheat System
+![Sentinel Guard](https://github.com/user-attachments/assets/02f98463-af93-4e40-a83a-2fcf498eeffe)
 
 A modular anti-cheat framework designed to detect and prevent common cheating techniques in FPS-style games. Inspired by Valorant’s Vanguard system, this project is organized into multiple components, each focusing on a specific detection or prevention method.
 
