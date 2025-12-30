@@ -31,13 +31,34 @@ SentinelGuard is a modular anti-cheat framework that detects and prevents common
 flowchart TB
     A["Detection Configuration<br/>Capture · Rules · Output"] --> B["SentinelGuard Core"]
 
-    B --> C["Detection Engine<br/>Real-time Cheating Detection"]
-    C --> D["Alert Pipeline<br/>Structured Events"]
+    B --> C["File Integrity Monitoring<br/>Baseline Hashing & Integrity Checks"]
+    B --> D["Memory Monitoring<br/>Suspicious Pattern Detection"]
+    C --> E["Self-Integrity System<br/>Anti-Tamper for Module"]
+    C --> F["File Integrity System<br/>Monitors Game Files for Changes"]
+    D --> G["Debugger Detection<br/>Checks for Debugger Attachments"]
+    D --> H["Memory Pattern Detection<br/>Detects Code Injection Attempts"]
 
-    D --> E1["Machine Output<br/>alerts.jsonl"]
-    D --> E2["Human Output<br/>alerts.log / console"]
+    F --> I1["Honeyfile Detection<br/>Tampering Detection via Honeypot"]
+    F --> I2["Integrity Violation Detection<br/>Missing/Modified Files"]
+    E --> J1["Baseline Signature Verification<br/>RSA-PSS Signature"]
+    E --> J2["Self-Integrity Check<br/>Module Hash Check"]
 
-    F["Live Game Data"] --> B
+    G --> K["Game Termination<br/>Simulated Forced Termination (Critical)"]
+    H --> K
+    I1 --> K
+    I2 --> K
+    J1 --> K
+    J2 --> K
+
+    F --> L["Encrypted File Integrity Baseline<br/>AES-256-GCM & RSA-PSS"]
+    L --> M["Logs<br/>Event Logging for Integrity & Debugging"]
+
+    M --> N["Log Outputs<br/>[INFO], [WARNING], [ERROR], [CRITICAL]"]
+
+    F --> O["File Hash Calculation<br/>SHA-256 File Hashing"]
+    O --> P["Baseline Decryption<br/>AES Key Derivation from RSA"]
+    O --> Q["Baseline Signature Verification<br/>Ensures Integrity"]
+
 ```
 
 ---
