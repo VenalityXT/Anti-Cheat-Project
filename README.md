@@ -14,10 +14,10 @@
 
 **A modular anti-cheat framework designed to detect and prevent common cheating techniques in FPS-style games. Inspired by Valorant’s Vanguard system, this project focuses on detection components without invasive enforcement.**
 
-[Architecture](docs/sentinelsystem_architecture.md) ·
-[Detection Components](docs/detection_components.md) ·
-[Tests](tests/) ·
-[Source](src/)
+[Placeholder](docs/sentinelsystem_architecture.md) ·
+[Placeholder](docs/detection_components.md) ·
+[Placeholder](tests/) ·
+[Placeholder](src/)
 
 </div>
 
