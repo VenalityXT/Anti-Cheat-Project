@@ -1,10 +1,45 @@
-# Anti-Cheat System
+<div align="center">
 
-A modular anti-cheat framework designed to detect and prevent common cheating techniques in FPS-style games. Inspired by Valorant’s Vanguard system, this project is organized into multiple components, each focusing on a specific detection or prevention method.
+<img width="1563" height="1563" alt="Sentinel Guard" src="https://github.com/user-attachments/assets/944f4c36-9a2d-4f1d-97a9-b767029ece47" />
 
-> [!IMPORTANT]
-> This project is a **research and learning framework**, not a production-grade anti-cheat system.
-> Several components demonstrate detection concepts without invasive enforcement.
+
+---
+
+## Anti-Cheat System
+
+![Python](https://img.shields.io/badge/Python-3.11+-blue)
+![Anti-Cheat](https://img.shields.io/badge/Focus-Anti%20Cheat-lightblue)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
+![Game Dev](https://img.shields.io/badge/Focus-Game%20Development-informational)
+![Tests](https://img.shields.io/badge/Tests-pytest-success)
+
+**A modular anti-cheat framework designed to detect and prevent common cheating techniques in FPS-style games. Inspired by Valorant’s Vanguard system, this project focuses on detection components without invasive enforcement.**
+
+[Architecture](docs/sentinelsystem_architecture.md) ·
+[Detection Components](docs/detection_components.md) ·
+[Tests](tests/) ·
+[Source](src/)
+
+</div>
+
+---
+
+## Overview
+
+SentinelGuard is a modular anti-cheat framework that detects and prevents common cheating techniques in first-person shooter (FPS) games. It includes components for detecting a variety of cheating methods such as aimbots, wallhacks, and more, while focusing on providing detection without enforcement.
+
+```mermaid
+flowchart TB
+    A["Detection Configuration<br/>Capture · Rules · Output"] --> B["SentinelGuard Core"]
+
+    B --> C["Detection Engine<br/>Real-time Cheating Detection"]
+    C --> D["Alert Pipeline<br/>Structured Events"]
+
+    D --> E1["Machine Output<br/>alerts.jsonl"]
+    D --> E2["Human Output<br/>alerts.log / console"]
+
+    F["Live Game Data"] --> B
+```
 
 ---
 
