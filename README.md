@@ -1,6 +1,6 @@
 <div align="center">
     
-<img width="879" height="614" alt="Sentinel" src="https://github.com/user-attachments/assets/115f8c77-bffa-457b-8a56-bd2aaff4c52d" />
+<img width="1563" height="607" alt="Sentinel (1)" src="https://github.com/user-attachments/assets/2a90cbec-f7f6-4183-b5e8-dbdd1ab3f172" />
 
 ---
 
