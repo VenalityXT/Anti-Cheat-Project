@@ -1,9 +1,11 @@
 # Memory Monitor Module (`memory_monitor.py`)
 
-A system memory monitoring module within the ClearSight Anti-Cheat framework. This module monitors system memory for suspicious patterns, detecting potential code injections or memory tampering attempts. You can view the code [here](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/memory_monitor.py).
+A runtime memory monitoring subsystem within the **ClearSight Anti-Cheat framework**. This module inspects process memory mappings to detect suspicious executable regions commonly associated with **code injection** and **in-memory tampering**, then responds with deterministic, logged termination events.
 
-> [!IMPORTANT]
-> This module is designed for **controlled lab and research environments**.  
+[SOURCE CODE](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/memory_monitor.py)
+
+> [!IMPORTANT]  
+> This module is intended for **controlled lab and research environments**.  
 > **Code obfuscation** and **anti-reversing measures** are intentionally **not implemented** to maintain **observability**, **testability**, and **debuggability** for research and detection validation.
 
 ---
@@ -12,32 +14,97 @@ A system memory monitoring module within the ClearSight Anti-Cheat framework. Th
 
 The Memory Monitor performs the following functions:
 
-- Scans system memory for suspicious executable regions, indicating potential code injection or tampering  
-- Detects memory regions with executable permissions in running processes  
+- Scans protected process memory mappings for suspicious executable regions indicating potential injection or tampering  
+- Flags executable memory regions that are **writable (RWX)** or **anonymous (no backing file path)**  
 - Logs suspicious memory detections at the `[WARNING]` level  
-- Terminates the game process immediately when a suspicious memory pattern is found or when a memory scanning error occurs, using `[FATAL]` termination codes  
-- Logs events using `[INFO]`, `[WARNING]`, `[ERROR]`, and `[FATAL]` levels  
+- Uses a repeated-hit threshold to reduce false positives before enforcement  
+- Terminates the protected process when the enforcement threshold is met or when a fatal memory scanning error occurs  
+- Logs events using `[INFO]`, `[WARNING]`, `[ERROR]`, and `[CRITICAL]` levels  
 
-When a validated memory tampering event is detected, the module triggers a simulated forced game termination recorded under `[FATAL]`.
+When a validated memory tampering condition is confirmed, the module triggers a simulated forced termination recorded under `[CRITICAL]`.
+
+---
+
+## Runtime Control Flow
+
+The Memory Monitor Module operates across **two conceptual layers**:  
+a high-level enforcement architecture that emphasizes security decisions and failure paths, and a lower-level execution flow that reflects how memory scanning and enforcement logic are implemented in code.
+
+To support both perspectives, the runtime behavior is documented using **two complementary diagrams**.
+
+### High-Level Enforcement Architecture (Conceptual)
+
+The following static flowchart presents a **system-level view** of the Memory Monitor’s runtime behavior. It emphasizes:
+
+- Trust boundaries between monitored and non-monitored processes  
+- Memory classification and enforcement decision points  
+- Non-recoverable failure paths and termination conditions  
+- The relationship between scanning, detection thresholds, and enforcement  
+
+This diagram is intended to communicate **what the system enforces and why**, rather than the precise order of function calls.
+
+<img width="2039" height="862" alt="memory_monitor runtime flowchart" src="https://github.com/user-attachments/assets/94977ecb-7532-4eb2-a794-4fe5bba35a9d" />
+
+### Execution Flow (Implementation-Level)
+
+The following Mermaid diagram documents the **runtime execution flow** as implemented in `memory_monitor.py`. It focuses on:
+
+- Function sequencing and control flow  
+- Loop structure and execution order  
+- Decision points as they occur during runtime  
+- How enforcement logic is reached in code  
+
+This view is intentionally closer to the implementation and is meant to aid code review, maintenance, and auditability.
+
+```mermaid
+flowchart LR
+A[Program Start] --> B[Initialize Logging] --> C[MemoryMonitor]
+
+C --> D[Enumerate Processes]
+D --> E{Process in TARGET_PROCESS_NAMES}
+
+E -->|No| D
+E -->|Yes| F[Read Memory Maps]
+
+F --> G{AccessDenied or NoSuchProcess}
+G -->|Yes| D
+G -->|No| H[Inspect Memory Regions]
+
+H --> I{Executable RWX or Anonymous}
+I -->|No| J[Sleep With Jitter]
+I -->|Yes| K[Increment SuspiciousHitCounter]
+
+K --> L[Log WARNING]
+L --> M{HitCount >= Threshold}
+
+M -->|No| J
+M -->|Yes| N[Terminate FI-MEM-001]
+
+J --> C
+N --> O[Exit]
+```
 
 ---
 
 ## Memory Monitoring Architecture
 
-The Memory Monitor uses `psutil` to iterate through running processes, checking their memory regions for unusual executable permissions that may indicate malicious code injection.
+The Memory Monitor uses `psutil` to enumerate running processes and inspect memory mappings. Instead of treating all executable memory as suspicious (high false positive risk), it evaluates **permission combinations** and **backing characteristics** that are more strongly correlated with injection-style behavior.
 
 ### Main Components:
 
-1. **Memory Pattern Detection**  
-   Scans each running process and its memory regions for executable sections marked with `'x'` permissions.  
-   If detected, the region is flagged as suspicious.
+1. **Process Scope Control**  
+   Restricts scanning to `TARGET_PROCESS_NAMES` to reduce noise and avoid irrelevant system processes.
 
-2. **Logging**  
-   The module logs all suspicious memory patterns detected using the Python `logging` module.  
-   Logs are written to `memory_monitor.log` file.
+2. **Suspicious Region Classification**  
+   A region is considered suspicious when it is:
+   - **Executable and writable** (RWX), or
+   - **Executable and anonymous** (no backing file path)
 
-3. **Game Termination**  
-   If suspicious memory or an error is detected, the game is immediately terminated using a simulated process termination event.
+3. **Behavioral Escalation**  
+   Suspicious hits are tracked per PID and enforced only after `SUSPICIOUS_HIT_THRESHOLD` is reached.
+
+4. **Sleep With Jitter**  
+   Scan intervals include jitter to reduce timing-based evasion.
 
 ---
 
@@ -46,29 +113,33 @@ The Memory Monitor uses `psutil` to iterate through running processes, checking 
 The module works as follows:
 
 1. **Memory Scan**  
-   Scans all running processes' memory regions using `psutil` and checks for executable sections.  
-   
-2. **Logging**  
-   Logs any suspicious memory regions found with the following message:
-   
-   `"[WARNING] Suspicious memory region found in process <process_name> (PID=<pid>): <memory_address>"`
+   Enumerates target processes and inspects their memory maps.
 
-3. **Termination**  
-   If suspicious memory is found or a scanning error occurs, the game is terminated using the `terminate_game()` function with `[FATAL]` error codes.
+2. **Classification**  
+   Flags suspicious memory regions based on:
+   - `perms` (permission flags)
+   - `path` (backing file path)
+   - `addr` (region address)
+
+3. **Logging**  
+   Logs suspicious regions at `[WARNING]` and increments hit counters.
+
+4. **Enforcement**  
+   If repeated detection reaches the threshold, enforcement triggers termination using `FI-MEM-001`.
 
 ---
 
 ## Memory Scan Error Handling
 
-In case of any error during memory scanning (e.g., access-denied errors, missing process), the module will:
+During scanning, certain errors are expected and handled gracefully:
 
-1. Log the error with a `[ERROR]` level message:
-   
-   `"[ERROR] Memory scanning error: <error_message>"`
+- `psutil.AccessDenied`
+- `psutil.NoSuchProcess`
+- transient memory map access failures
 
-2. Terminate the game using `[FATAL]` error code:
-   
-   `"[FATAL] FI-MEM-002 Memory scanning error: <error_message>"`
+These events are logged and scanning continues.
+
+Only unrecoverable scanning failures result in termination using `FI-MEM-002`.
 
 ---
 
@@ -76,14 +147,17 @@ In case of any error during memory scanning (e.g., access-denied errors, missing
 
 The module uses four severity levels:
 
-- `[INFO]` — Normal operations, such as successful memory monitor startup or successful memory scan completion  
-- `[WARNING]` — Suspicious activity detected, such as finding executable memory regions  
-- `[ERROR]` — Memory scan errors or access-related issues  
-- `[FATAL]` — Termination events due to suspicious memory or scanning errors
+- `[INFO]` — Normal operations, such as startup and loop initialization  
+- `[WARNING]` — Suspicious activity detected, such as RWX or anonymous executable regions  
+- `[ERROR]` — Recoverable scanning issues or unexpected exceptions  
+- `[CRITICAL]` — Termination events  
 
-Example `[FATAL]` entry:
+Example `[CRITICAL]` entry:
 
-`2025-12-11 12:41:22,118 [MEMORY_MONITOR] [FATAL] [FI-MEM-001] Terminating simulated game process (PID=4211) — Reason: Suspicious executable memory detected.`
+Xtext
+2025-12-11 12:41:22,118 [MEMORY_MONITOR] [CRITICAL] [FI-MEM-001]
+Terminating protected process (PID = 4211) - Reason: Repeated detection of suspicious executable memory
+X
 
 All logs are written to:
 
@@ -97,11 +171,11 @@ If the `logs/` directory does not exist, it is automatically created.
 
 The module uses standardized event codes:
 
-| Code         | Meaning                                    |
-|--------------|--------------------------------------------|
-| FI-MEM-001   | Suspicious executable memory detected      |
-| FI-MEM-002   | Memory scanning error                      |
-| FI-DBG-001   | Debugger detected                          |
+| Code        | Meaning                                             |
+|------------|-----------------------------------------------------|
+| FI-MEM-001 | Repeated detection of suspicious executable memory |
+| FI-MEM-002 | Fatal memory scanning error                        |
+| FI-DBG-001 | Debugger detected                                  |
 
 ---
 
@@ -110,15 +184,15 @@ The module uses standardized event codes:
 During development:
 
 - Enable `DEV_MODE = True`  
-- Modify code freely  
-- Logs are written at `[WARNING]` level for potential tampering  
-- Debugger detection is ignored, and game termination becomes non-blocking  
+- Observe `[WARNING]` events to tune thresholds and validate detection logic  
+- Debugger detection is ignored, and enforcement can be tested safely in a lab environment  
 
 Before production:
 
 - Disable `DEV_MODE`  
-- Regenerate final baselines  
-- Protect key files and folders from modification  
+- Confirm `TARGET_PROCESS_NAMES` is accurate  
+- Validate threshold behavior against benign workloads  
+- Protect configuration and log paths from modification  
 
 ---
 
@@ -132,12 +206,13 @@ Before production:
 
 The Memory Monitor forms a critical part of the ClearSight Anti-Cheat system by providing:
 
-- Memory tamper detection using executable permissions  
-- Game termination when suspicious memory is detected  
-- Robust logging to track all events  
-- Error handling to gracefully terminate on scan issues
+- Suspicious executable memory detection focused on RWX and anonymous executable regions  
+- Threshold-based enforcement to reduce false positives  
+- Deterministic termination logic with standardized event codes  
+- Structured logging to support auditing and detection validation  
+- Jitter-based timing to reduce predictable scan patterns  
 
-It is designed to be **secure**, **reliable**, and **production-ready**.
+It is designed to be **secure**, **reliable**, and **research-focused**, emphasizing clarity and observability over concealment.
 
 ---
 
