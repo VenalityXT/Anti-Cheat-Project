@@ -4,7 +4,7 @@ The File Integrity Module is a cryptographically enforced anti-tamper subsystem 
 
 This module is designed to be **auditable, research-focused, and deterministic**, prioritizing clarity of logic and cryptographic correctness over adversarial obfuscation.
 
-[Source code](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/file_integrity.py)  
+[SOURCE CODE](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/file_integrity.py)  
 
 > [!IMPORTANT]  
 > This module is intended for **controlled lab and research environments**.  
