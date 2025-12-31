@@ -79,7 +79,7 @@ def check_for_suspicious_memory_patterns():
 
                     # Look for executable regions
                     perms = getattr(region, 'perms', '')
-                    if 'x' in perms:
+                    if 'x' in perms and ('w' in perms or not region.path)::
                         suspicious_region = getattr(region, 'addr', 'UNKNOWN_ADDR')
 
                         debug(f"""
