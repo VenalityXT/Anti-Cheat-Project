@@ -1,44 +1,41 @@
-# ==================================================================================================
-# FILE_INTEGRITY.PY
-#
-# PURPOSE:
-#   Provides secure, production-style file integrity monitoring for an FPS anti-cheat engine.
-# =================================================================================================== #
+__LICENSE__ = "Proprietary / Educational Use"
+__AUTHOR__  = "Michael Guajardo"
+__PROJECT__ = "SentinelGuard"
+__MODULE__  = "File Integrity"
+__VERSION__ = "1.2.5"
 
+# -- [IMPORTS] -- #
 
-# ============================================= IMPORTS ============================================= #
-import os
-import sys
-import time
-import json
-import random
-import hashlib
-import logging
-import secrets
-import ctypes
-from typing import Dict
-
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+from typing import Dict
 
+import logging
+import secrets
+import hashlib
+import random
+import ctypes
+import time
+import json
+import sys
+import os
 
-# ============================================ CONSTANTS ============================================ #
+# -- [VARIABLES] -- #
 
-# Developer debug output toggle
+# Developer debug toggles
 DEBUG_MODE = True
 DEV_MODE = True
 
-# Root directory of the game to monitor
 GAME_DIRECTORY = r"C:\Users\mguaj\OneDrive\Desktop\MyFPSGame"
-
-BASELINE_FILE = os.path.join(GAME_DIRECTORY, "ClearSight", "data", "baseline", "hashes.bin")
-BASELINE_SIGNATURE_FILE = os.path.join(GAME_DIRECTORY, "ClearSight", "data", "baseline", "hashes.sig")
 
 SELF_HASH_FILE = os.path.join(GAME_DIRECTORY, "ClearSight", "data", "baseline", "self_integrity.bin")
 SELF_HASH_SIGNATURE_FILE = os.path.join(GAME_DIRECTORY, "ClearSight", "data", "baseline", "self_integrity.sig")
+
+BASELINE_FILE = os.path.join(GAME_DIRECTORY, "ClearSight", "data", "baseline", "hashes.bin")
+BASELINE_SIGNATURE_FILE = os.path.join(GAME_DIRECTORY, "ClearSight", "data", "baseline", "hashes.sig")
 
 PUBLIC_KEY_FILE = os.path.join(GAME_DIRECTORY, "ClearSight", "keys", "public_key.pem")
 PRIVATE_KEY_FILE = os.path.join(GAME_DIRECTORY, "ClearSight", "keys", "private_key.pem")
@@ -53,315 +50,217 @@ EXCLUDED_EXTENSIONS = [".tmp", ".log", ".cache"]
 SCAN_INTERVAL_SECONDS = 30
 JITTER_SECONDS = 15
 
+# -- [LOGGING SETUP] -- #
 
-# =========================================== LOGGING SETUP ========================================= #
+LogDirectory = os.path.dirname(LOG_FILE)
 
-log_dir = os.path.dirname(LOG_FILE)
-if log_dir and not os.path.exists(log_dir):
-    os.makedirs(log_dir, exist_ok=True)
-    print(f"[FILE_INTEGRITY] Log directory '{log_dir}' did not exist. Created automatically.")
+if LogDirectory and not os.path.exists(LogDirectory):
+    os.makedirs(LogDirectory, exist_ok = True)
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [FILE_INTEGRITY] [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler(sys.stdout)
-    ],
+    level = logging.INFO,
+    format = "%(asctime)s [FILE_INTEGRITY] [%(levelname)s] %(message)s",
+    handlers = [logging.FileHandler(LOG_FILE), logging.StreamHandler(sys.stdout)],
 )
 
-logging.info("File Integrity Module Loaded Successfully.")
+logging.info("File Integrity Module Loaded Successfully")
 
+# -- [FUNCTIONS] -- #
 
-# ========================================= UTILITY HELPERS ========================================== #
-
-def debug(msg: str):
+# Prints debug messages to the terminal if DEBUG_MODE is True
+def Debug(Message: str) -> None:
     if DEBUG_MODE:
-        print(f"{msg}")
+        print(Message)
 
-
-def canonical(path: str) -> str:
-    return os.path.abspath(os.path.normpath(path))
-
-
-def is_debugger_present() -> bool:
+# Disable check by setting DEV_MODE to True
+def IsDebuggerPresent() -> bool:
     if sys.gettrace():
         return True
 
     try:
         return ctypes.windll.kernel32.IsDebuggerPresent() != 0
+
     except Exception:
         return False
 
+# Converts relative path -> absolute path while preventing:
+#   - Duplicate Hash Evasion  
+#   - Path Traversal Tricks
+#   - Baseline Poisoning
+def Canonical(Path: str) -> str:
+    return os.path.abspath(os.path.normpath(Path))
 
-def terminate_game(event: str, reason: str):
-    pid = random.randint(2000, 9999)
-    logging.critical(f"[{event}] Terminating simulated game process (PID={pid}) — Reason: {reason}")
+def TerminateGame(Event: str, Reason: str, ProcessID: int = -1) -> None:
+    logging.critical(
+        f"[{Event}] Terminating protected process "
+        f"(PID = {ProcessID}) - Reason: {Reason}"
+    )
+
+    # Small delay prevents immediate crash signatures and mirrors real world enforcement timing.
     time.sleep(1.5)
     sys.exit(1)
 
+# -- [CRYPTOGRAPHY LAYER] -- #
 
-# ========================================== CRYPTOGRAPHY LAYER ====================================== #
-
-def derive_aes_key_from_private_key() -> bytes:
+# Obtains symmetric AES key from RSA private key using PBKDF2 (Does not store directly on disk)
+def DeriveAESKeyFromPrivateKey() -> bytes:
     if not os.path.exists(PRIVATE_KEY_FILE):
-        terminate_game("FI-KEY-001", "Missing RSA private key.")
+        TerminateGame("FI-KEY-001", "Missing RSA private key")
 
-    with open(PRIVATE_KEY_FILE, "rb") as f:
-        key_data = f.read()
+    with open(PRIVATE_KEY_FILE, "rb") as File:
+        KeyData = File.read()
 
-    private_key = serialization.load_pem_private_key(key_data, password=None)
-    numbers = private_key.private_numbers()
+    # Extracting the raw numerical values that constitutes the key
+    PrivateKey = serialization.load_pem_private_key(KeyData, password = None)
+    Numbers = PrivateKey.private_numbers()
 
-    digest = hashlib.sha256()
-    digest.update(numbers.p.to_bytes((numbers.p.bit_length() + 7) // 8, "big"))
-    digest.update(numbers.q.to_bytes((numbers.q.bit_length() + 7) // 8, "big"))
-    digest.update(numbers.d.to_bytes((numbers.d.bit_length() + 7) // 8, "big"))
-    seed = digest.digest()
+    # Creating and feeding data to the hash object using SHA256
+    #   - SHA256 is the industry standard providing the best mix of security and speed
+    Digest = hashlib.sha256()
+    Digest.update(Numbers.p.to_bytes((Numbers.p.bit_length() + 7) // 8, "big")) # Large prime factor
+    Digest.update(Numbers.q.to_bytes((Numbers.q.bit_length() + 7) // 8, "big")) # Large prime factor
+    Digest.update(Numbers.d.to_bytes((Numbers.d.bit_length() + 7) // 8, "big")) # The private exponent
 
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=b"AntiCheatAESDerivationSalt",
-        iterations=100000,
-        backend=default_backend(),
+    # Retrieve the binary digest
+    Seed = Digest.digest()
+
+    # Password Based Key Derivation Function 2
+    KeyDerivationFunction = PBKDF2HMAC(
+        algorithm = hashes.SHA256(),
+        length = 32,
+        salt = b"AntiCheatAESDerivationSalt",
+        iterations = 100000,
+        backend = default_backend()
     )
 
-    return kdf.derive(seed)
+    return KeyDerivationFunction.derive(Seed)
 
+# Encrypts structured integrity data using AES-GCM
+def EncryptJSON(Data: dict, AESKey: bytes) -> bytes:
+    JsonBytes = json.dumps(Data, indent = 4).encode("utf-8")
 
-def encrypt_json(data: dict, aes_key: bytes) -> bytes:
-    json_bytes = json.dumps(data, indent=4).encode("utf-8")
+    Nonce = secrets.token_bytes(12)
+    CipherObj = Cipher(algorithms.AES(AESKey), modes.GCM(Nonce), backend = default_backend())
+    Encryptor = CipherObj.encryptor()
 
-    nonce = secrets.token_bytes(12)
-    cipher = Cipher(algorithms.AES(aes_key), modes.GCM(nonce), backend=default_backend())
-    encryptor = cipher.encryptor()
+    CipherText = Encryptor.update(JsonBytes) + Encryptor.finalize()
+    return Nonce + Encryptor.tag + CipherText
 
-    ciphertext = encryptor.update(json_bytes) + encryptor.finalize()
+# Decrypts AES-GCM encrypted integrity data back into structured form
+def DecryptJSON(Blob: bytes, AESKey: bytes) -> dict:
+    Nonce, Tag, CipherText = Blob[:12], Blob[12:28], Blob[28:]
 
-    return nonce + encryptor.tag + ciphertext
+    CipherObj = Cipher(algorithms.AES(AESKey), modes.GCM(Nonce, Tag), backend = default_backend())
+    Decryptor = CipherObj.decryptor()
 
+    PlainText = Decryptor.update(CipherText) + Decryptor.finalize()
+    return json.loads(PlainText.decode("utf-8"))
 
-def decrypt_json(blob: bytes, aes_key: bytes) -> dict:
-    nonce = blob[:12]
-    tag = blob[12:28]
-    ciphertext = blob[28:]
+# Computes a SHA-256 hash of a file
+def ComputeFileHash(Path: str) -> str:
+    SHA = hashlib.sha256()
 
-    cipher = Cipher(algorithms.AES(aes_key), modes.GCM(nonce, tag), backend=default_backend())
-    decryptor = cipher.decryptor()
+    with open(Path, "rb") as File:
+        while Chunk := File.read(4096):
+            SHA.update(Chunk)
 
-    plaintext = decryptor.update(ciphertext) + decryptor.finalize()
-    return json.loads(plaintext.decode("utf-8"))
+    return SHA.hexdigest()
 
+# Digitally signs integrity data using the RSA private key
+def SignBlob(Blob: bytes, OutputSignaturePath: str) -> None:
+    if not os.path.exists(PRIVATE_KEY_FILE):
+        TerminateGame("FI-KEY-002", "Private key missing during signing")
 
-def verify_signature(blob: bytes, signature_path: str, public_key_path: str) -> bool:
-    if not os.path.exists(signature_path):
-        logging.error("Signature file missing during verification.")
-        debug(f"Missing signature file: {signature_path}")
-        return False
-
-    signature = open(signature_path, "rb").read()
-
-    with open(public_key_path, "rb") as f:
-        public_key = serialization.load_pem_public_key(f.read())
-
-    try:
-        public_key.verify(
-            signature,
-            blob,
-            padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
-            hashes.SHA256(),
+    with open(PRIVATE_KEY_FILE, "rb") as File:
+        PrivateKey = serialization.load_pem_private_key(
+            File.read(), password = None
         )
-        return True
 
-    except Exception as e:
-        logging.error(f"Digital signature verification failed: {e}")
-        debug(f"""
-                --- SIGNATURE VERIFICATION FAILURE ---
-                Blob size: {len(blob)} bytes
-                Signature size: {len(signature)} bytes
-                Signature path: {signature_path}
-                Public key path: {public_key_path}
-                Error: {e}
-                -------------------------------------
-            """)
-        return False
-
-
-def sign_blob(blob: bytes, output_signature_path: str):
-    private_key = serialization.load_pem_private_key(open(PRIVATE_KEY_FILE, "rb").read(), password=None)
-
-    signature = private_key.sign(
-        blob,
-        padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
-        hashes.SHA256(),
+    Signature = PrivateKey.sign(
+        Blob,
+        padding.PSS(
+            mgf = padding.MGF1(hashes.SHA256()),
+            salt_length = padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
     )
 
-    with open(output_signature_path, "wb") as f:
-        f.write(signature)
+    with open(OutputSignaturePath, "wb") as SigFile:
+        SigFile.write(Signature)
 
-
-# ========================================== SELF-INTEGRITY CHECK ==================================== #
-
-def compute_file_hash(path: str) -> str:
-    sha = hashlib.sha256()
-    with open(path, "rb") as f:
-        while chunk := f.read(4096):
-            sha.update(chunk)
-    return sha.hexdigest()
-
-
-def verify_self_integrity(aes_key: bytes):
-    my_path = canonical(__file__)
-    current_hash = compute_file_hash(my_path)
+# Verifies the integrity of the anti-cheat module itself
+def VerifySelfIntegrity() -> None:
+    ScriptPath = Canonical(__file__)
+    CurrentHash = ComputeFileHash(ScriptPath)
 
     if not os.path.exists(SELF_HASH_FILE):
-        logging.info("No self-integrity baseline found — creating one now.")
-        blob = current_hash.encode("utf-8")
-        open(SELF_HASH_FILE, "wb").write(blob)
-        sign_blob(blob, SELF_HASH_SIGNATURE_FILE)
+        Blob = CurrentHash.encode("utf-8")
+        open(SELF_HASH_FILE, "wb").write(Blob)
+        SignBlob(Blob, SELF_HASH_SIGNATURE_FILE)
         return
 
-    baseline_hash = open(SELF_HASH_FILE, "rb").read().decode("utf-8")
+    BaselineHash = open(SELF_HASH_FILE, "rb").read().decode("utf-8")
 
-    if not verify_signature(baseline_hash.encode("utf-8"), SELF_HASH_SIGNATURE_FILE, PUBLIC_KEY_FILE):
-        debug("Self-integrity signature verification failed.")
-        terminate_game("FI-SI-001", "Self-integrity signature invalid.")
+    if BaselineHash != CurrentHash:
+        TerminateGame("FI-SI-002", "Anti-cheat module has been modified")
 
-    if baseline_hash != current_hash:
-        debug(f"""
-            --- SELF INTEGRITY HASH MISMATCH ---
-            Expected hash: {baseline_hash}
-            Current hash:  {current_hash}
-            Script path:   {my_path}
-            -----------------------------------
-            """)
-        terminate_game("FI-SI-002", "Anti-cheat module has been modified!")
+# -- [FILE SCANNING] -- #
 
+def ShouldExclude(Path: str) -> bool:
+    Lower = Path.lower()
 
-# ========================================== BASELINE LOAD/SAVE ====================================== #
-
-def load_baseline(aes_key: bytes) -> Dict[str, str]:
-    if not os.path.exists(BASELINE_FILE):
-        logging.warning("Baseline not found — creating new baseline on this run.")
-        return {}
-
-    blob = open(BASELINE_FILE, "rb").read()
-
-    if not verify_signature(blob, BASELINE_SIGNATURE_FILE, PUBLIC_KEY_FILE):
-        terminate_game("FI-BL-001", "Baseline signature invalid.")
-
-    try:
-        return decrypt_json(blob, aes_key)
-    except Exception as e:
-        debug(f"Baseline decryption failure: {e}")
-        terminate_game("FI-BL-002", f"Baseline decryption failed: {e}")
-
-
-def save_baseline(hashes: Dict[str, str], aes_key: bytes):
-    blob = encrypt_json(hashes, aes_key)
-    open(BASELINE_FILE, "wb").write(blob)
-    sign_blob(blob, BASELINE_SIGNATURE_FILE)
-    logging.info("Baseline saved + signed successfully.")
-
-
-# ========================================== FILE SCANNING LOGIC ===================================== #
-
-def should_exclude(path: str) -> bool:
-    path_lower = path.lower()
-
-    for folder in EXCLUDED_FOLDERS:
-        if folder.lower() in path_lower:
+    for Folder in EXCLUDED_FOLDERS:
+        if Folder.lower() in Lower:
             return True
 
-    _, ext = os.path.splitext(path)
-    return ext.lower() in EXCLUDED_EXTENSIONS
+    _, Ext = os.path.splitext(Path)
+    return Ext.lower() in EXCLUDED_EXTENSIONS
 
+# Creates a file integrity snapshot through recursive scans and hashing
+def ScanDirectory(Root: str) -> Dict[str, str]:
+    Result, Files = {}, []
 
-def scan_directory(root: str) -> Dict[str, str]:
-    hashes = []
-    result = {}
+    for FileDirectory, _, Files in os.walk(Root):
+        for File in Files:
+            FullPath = Canonical(os.path.join(FileDirectory, File))
 
-    for dirpath, _, files in os.walk(root):
-        for fname in files:
-            full = canonical(os.path.join(dirpath, fname))
-            if not should_exclude(full):
-                hashes.append(full)
+            # Filters out excluded files
+            #   - Cache, logs, temp, etc.
+            if not ShouldExclude(FullPath):
+                Files.append(FullPath)
 
-    random.shuffle(hashes)
+    # Shuffles file order to make timing based tampering harder
+    random.shuffle(Files)
 
-    for path in hashes:
+    for File in Files:
         try:
-            result[path] = compute_file_hash(path)
-        except Exception as e:
-            logging.error(f"Error hashing file {path}: {e}")
-            debug(f"Hashing exception for {path}: {e}")
+            Result[File] = ComputeFileHash(File)
 
-    return result
+        except Exception as Error:
+            logging.error(f"Error hashing file {File}: {Error}")
 
+    return Result
 
-# ========================================== HONEYFILE CHECK ========================================= #
+# -- [MONITOR LOOP] -- #
 
-def check_honeyfile():
-    if not os.path.exists(HONEYFILE_PATH):
-        debug(f"Honeyfile missing at: {HONEYFILE_PATH}")
-        terminate_game("FI-HF-001", "Honeyfile is missing! Potential tampering.")
+def Monitor() -> None:
+    VerifySelfIntegrity()
 
-
-# ========================================== MONITOR LOOP ============================================ #
-
-def monitor():
-    aes_key = derive_aes_key_from_private_key()
-    verify_self_integrity(aes_key)
-
-    baseline = load_baseline(aes_key)
-    if not baseline:
-        logging.info("Generating baseline hashes...")
-        baseline = scan_directory(GAME_DIRECTORY)
-        save_baseline(baseline, aes_key)
+    Baseline = ScanDirectory(GAME_DIRECTORY)
 
     while True:
+        if IsDebuggerPresent() and not DEV_MODE:
+            TerminateGame("FI-DBG-001", "Debugger detected")
 
-        if is_debugger_present():
-            if not DEV_MODE:
-                terminate_game("FI-DBG-001", "Debugger detected.")
-            else:
-                logging.warning("Debugger detected, but ignoring due to DEV_MODE.")
+        Current = ScanDirectory(GAME_DIRECTORY)
 
-        check_honeyfile()
+        if Baseline != Current:
+            TerminateGame("FI-INT-001", "Integrity violation detected")
 
-        current = scan_directory(GAME_DIRECTORY)
+        SleepTime = SCAN_INTERVAL_SECONDS + random.randint(-JITTER_SECONDS, JITTER_SECONDS)
+        time.sleep(max(5, SleepTime))
 
-        missing = [p for p in baseline if p not in current]
-        modified_or_new = [p for p in current if p not in baseline or current[p] != baseline[p]]
-
-        # DEBUG OUTPUT FOR MISSING FILES
-        if DEBUG_MODE and missing:
-            for p in missing:
-                debug(f"FILE REMOVED: {p}")
-
-        # DEBUG OUTPUT FOR MODIFIED OR NEW FILES
-        if DEBUG_MODE and modified_or_new:
-            for p in modified_or_new:
-                old = baseline.get(p, "<NEW FILE>")
-                new = current[p]
-
-                debug(f"""
-                    --- FILE MODIFIED/NEW DETECTED ---
-                    Path: {p}
-                    Old hash: {old}
-                    New hash: {new}
-                    ----------------------------------
-                    """)
-
-        if missing or modified_or_new:
-            terminate_game("FI-INT-001", "Integrity violation detected.")
-
-        sleep_time = SCAN_INTERVAL_SECONDS + random.randint(-JITTER_SECONDS, JITTER_SECONDS)
-        time.sleep(max(5, sleep_time))
-
-
-# =============================================== ENTRY POINT ======================================== #
+# -- [MONITOR] -- #
 
 if __name__ == "__main__":
-    monitor()
+    Monitor()
