@@ -1,7 +1,7 @@
 __LICENSE__ = "Proprietary / Educational Use"
 __AUTHOR__ = "Michael Guajardo"
 __PROJECT__ = "SentinelGuard"
-__CREATED__ = "12-2025"
+__MODULE__ = "Memory Monitor"
 __VERSION__ = "1.1.2"
 
 # -- [IMPORTS] -- #
