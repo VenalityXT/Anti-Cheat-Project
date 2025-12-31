@@ -23,6 +23,60 @@ The File Integrity Checker performs the following functions:
 
 When a validated tamper event is detected, the module triggers a simulated forced game termination recorded under `[CRITICAL]`.
 
+```mermaid
+flowchart LR
+A[Program Start] --> B[Initialize Logging]
+B --> C[Monitor]
+
+C --> D[VerifySelfIntegrity]
+D --> E[ComputeFileHash __file__]
+E --> F{Baseline Exists}
+
+F -->|No| G[Write Baseline Hash]
+G --> H[Sign Baseline with RSA Private Key]
+H --> I[Return to Monitor]
+
+F -->|Yes| J{Hash Matches}
+J -->|No| K[Terminate FI-SI-002]
+J -->|Yes| I
+
+I --> L[ScanDirectory Game Directory]
+L --> M[Recursive File Walk]
+M --> N[Canonicalize Paths]
+N --> O[Exclude Filter]
+O --> P[Compute SHA-256 Per File]
+P --> Q[Shuffle File Order]
+Q --> R[Baseline Snapshot In Memory]
+
+R --> S[Monitoring Loop]
+
+S --> T{Debugger Present}
+T -->|Yes| U[Terminate FI-DBG-001]
+T -->|No| V[ScanDirectory Game Directory]
+
+V --> W[Current Snapshot]
+W --> X{Baseline Equals Current}
+
+X -->|No| Y[Terminate FI-INT-001]
+X -->|Yes| Z[Sleep With Jitter]
+Z --> S
+
+subgraph Cryptography
+    C1[RSA Private Key File] --> C2[Load RSA Private Key]
+    C2 --> C3[Extract p q d]
+    C3 --> C4[SHA-256 p q d]
+    C4 --> C5[Seed 32 Bytes]
+    C5 --> C6[PBKDF2 HMAC SHA256]
+    C6 --> C7[AES 256 Key]
+
+    C7 --> C8[AES GCM Encrypt JSON]
+    C7 --> C9[AES GCM Decrypt JSON]
+
+    C1 --> C10[RSA PSS Sign Blob]
+    C10 --> C11[Signature Written]
+end
+```
+
 ---
 
 ## Baseline Architecture
