@@ -1,163 +1,137 @@
-# ==================================================================================================
-# MEMORY_MONITOR.PY
-#
-# PURPOSE:
-#   Monitors system memory for suspicious patterns, detecting potential code injections or memory tampering.
-#   Designed to work alongside the file integrity module.
-#
-# DESIGN GOAL:
-#   Highly secure, suitable for detecting in-memory tampering or malicious code injection attempts.
-# =================================================================================================== #
+__LICENSE__ = "Proprietary / Educational Use"
+__AUTHOR__ = "Michael Guajardo"
+__PROJECT__ = "SentinelGuard"
+__CREATED__ = "12-2025"
+__VERSION__ = "1.1.2"
 
-import psutil
+# -- [IMPORTS] -- #
+
+from collections import defaultdict
+
 import logging
 import random
+import psutil
 import time
 import sys
 import os
 
-# ================================================== CONSTANTS ====================================== #
+# -- [VARIABLES] -- #
 
-# Developer debugging (extra internal prints)
-DEBUG_MODE = False
-
-# Log file path for memory monitoring
 MEMORY_LOG_FILE = r"C:\Users\mguaj\OneDrive\Desktop\MyFPSGame\ClearSight\logs\memory_monitor.log"
-
-# Monitoring interval in seconds
+TARGET_PROCESS_NAMES = {"Game.exe"}
+SUSPICIOUS_HIT_THRESHOLD = 3
 MONITOR_INTERVAL = 30
 
-# ================================================== LOGGING SETUP ================================== #
+# -- [LOGGING SETUP] -- #
 
-log_dir = os.path.dirname(MEMORY_LOG_FILE)
+LogDirectory = os.path.dirname(MEMORY_LOG_FILE)
 
-if log_dir and not os.path.exists(log_dir):
-    os.makedirs(log_dir, exist_ok=True)
-    print(f"[MEMORY_MONITOR] Log directory '{log_dir}' did not exist. Created automatically.")
+if LogDirectory and not os.path.exists(LogDirectory):
+    os.makedirs(LogDirectory, exist_ok = True)
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [MEMORY_MONITOR] [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(MEMORY_LOG_FILE),
-        logging.StreamHandler(sys.stdout)
-    ],
+    level = logging.INFO,
+    format = "%(asctime)s [MEMORY_MONITOR] [%(levelname)s] %(message)s",
+    handlers = [logging.FileHandler(MEMORY_LOG_FILE), logging.StreamHandler(sys.stdout)]
 )
 
-logging.info("Memory Monitor Module Loaded Successfully.")
+logging.info("Memory Monitor Module Loaded Successfully!")
 
-# ================================================== DEBUG HELPER =================================== #
+# -- [STATE TRACKING SETUP] -- #
 
-def debug(msg: str):
-    if DEBUG_MODE:
-        print(f"[DEBUG] {msg}")
+# Track suspicious hits per PID across scans to enable behavioral enforcement
+SuspiciousHitCounter = defaultdict(int)
 
-# ================================================== MEMORY MONITORING ================================= #
+# -- [FUNCTIONS] -- #
 
-def check_for_suspicious_memory_patterns():
-    """
-    Detect suspicious memory patterns indicating possible code injection.
-    Scans processes for executable memory regions.
-    """
-    try:
-        for proc in psutil.process_iter(['pid', 'name']):
+def CheckMemoryPatterns():
+    for Process in psutil.process_iter(['pid', 'name']):
+
+        try:
+            ProcessName = Process.info.get('name')
+
+            # Restricts scanning to listed application(s) only
+            if ProcessName not in TARGET_PROCESS_NAMES:
+                continue
+            PID = Process.pid
+            logging.debug(f"Scanning process {ProcessName} (PID = {PID})")
+
             try:
-                debug(f"Scanning process: {proc.name()} (PID={proc.pid})")
+                MemoryMaps = Process.memory_maps()
+                
+            except (psutil.AccessDenied, psutil.NoSuchProcess):
+                logging.debug(f"Unable to access memory maps for {ProcessName} (PID = {PID})")
+                continue
 
-                memory_maps = proc.memory_maps()
+            for Region in MemoryMaps:
+                Address = getattr(Region, "addr", "UNKNOWN")
+                Permissions = getattr(Region, "perms", "")
+                Path = getattr(Region, "path", "") or ""
 
-                for region in memory_maps:
-                    # Debug display full memory map entry
-                    if DEBUG_MODE:
-                        debug(f"Region: addr={getattr(region, 'addr', '')}, "
-                              f"perms={getattr(region, 'perms', '')}, "
-                              f"path={getattr(region, 'path', '')}")
+                # Executable memory alone is normal
+                # Suspicion arises when memory is:
+                #   - Executable + writable (RWX)
+                #   - Executable with no backing file (anonymous injection)
+                IsExecutable = 'x' in Permissions
+                IsWritable = 'w' in Permissions
+                IsAnonymous = Path.strip() == ""
 
-                    # Skip regions without a path
-                    if not hasattr(region, 'path'):
-                        continue
+                if IsExecutable and (IsWritable or IsAnonymous):
+                    SuspiciousHitCounter[PID] += 1
 
-                    # Look for executable regions
-                    perms = getattr(region, 'perms', '')
-                    if 'x' in perms and ('w' in perms or not region.path)::
-                        suspicious_region = getattr(region, 'addr', 'UNKNOWN_ADDR')
+                    logging.warning(
+                        f"Suspicious memory region detected | "
+                        f"Process = {ProcessName} PID = {PID} "
+                        f"Addr = {Address} Perms = {Permissions} Path = {Path or '[anonymous]'} "
+                        f"HitCount={SuspiciousHitCounter[PID]}"
+                    )
 
-                        debug(f"""
---- SUSPICIOUS EXECUTABLE MEMORY REGION ---
-Process: {proc.name()} (PID={proc.pid})
-Region Address: {suspicious_region}
-Permissions: {perms}
-Path: {region.path}
--------------------------------------------
-""")
-
-                        logging.warning(
-                            f"Suspicious executable memory region found in {proc.name()} "
-                            f"(PID={proc.pid}): {suspicious_region}"
+                    # Require repeated detections before enforcement.
+                    if SuspiciousHitCounter[PID] >= SUSPICIOUS_HIT_THRESHOLD:
+                        TerminateGame(
+                            Event = "FI-MEM-001",
+                            Reason =(
+                                "Repeated detection of suspicious executable memory "
+                                f"(RWX or anonymous) in process {ProcessName}"
+                            ),
+                            ProcessID = PID
                         )
 
-                        terminate_game("FI-MEM-001",
-                                       f"Suspicious executable memory detected in process {proc.name()}.")
+        except psutil.NoSuchProcess:
+            continue
+        
+        except Exception as Error:
+            logging.error(f"Unhandled error while scanning memory: {Error}")
 
-            except psutil.AccessDenied:
-                debug(f"Access denied when scanning process {proc.name()} (PID={proc.pid})")
-                continue
 
-            except psutil.NoSuchProcess:
-                debug(f"Process disappeared before scanning completed.")
-                continue
+def TerminateGame(Event: str, ProcessID: int, Reason: str) -> None:
+    logging.critical(
+        f"[{Event}] Terminating protected process "
+        f"(PID = {ProcessID}) - Reason: {Reason}"
+    )
 
-            except Exception as e:
-                debug(f"Unhandled error while scanning process {proc.name()} (PID={proc.pid}): {e}")
-                logging.error(f"Error reading memory maps for {proc.name()} (PID={proc.pid}): {e}")
-                continue
-
-    except Exception as e:
-        debug(f"""
---- MEMORY SCANNING FATAL ERROR ---
-Error: {e}
------------------------------------
-""")
-        logging.error(f"Error scanning memory: {e}")
-        terminate_game("FI-MEM-002", f"Memory scanning error: {e}")
-
-def terminate_game(event: str, reason: str):
-    """
-    Simulate game termination due to suspicious memory detection.
-    """
-    pid = random.randint(2000, 9999)
-
-    debug(f"""
---- GAME TERMINATION TRIGGERED ---
-Event: {event}
-Reason: {reason}
-Simulated PID: {pid}
-----------------------------------
-""")
-
-    logging.critical(f"[{event}] Terminating simulated game process (PID={pid}) — Reason: {reason}")
+    # Small delay prevents immediate crash signatures and mirrors real world enforcement timing.
     time.sleep(1.5)
     sys.exit(1)
 
-# ================================================== MONITORING LOOP ================================= #
 
-def monitor_memory():
-    """
-    Main memory monitoring loop.
-    """
-    logging.info("Starting memory monitoring loop.")
+def MemoryMonitor() -> None:
+    logging.info("Starting memory monitoring loop")
 
     while True:
-        debug("Running memory scan...")
-        check_for_suspicious_memory_patterns()
+        CheckMemoryPatterns()
 
-        sleep_time = MONITOR_INTERVAL + random.randint(-5, 5)
-        sleep_time = max(5, sleep_time)
+        # Using jitter to reduce timing based evasion
+        SleepTime = random.uniform(
+            MONITOR_INTERVAL * 0.8,
+            MONITOR_INTERVAL * 1.3
+        )
 
-        debug(f"Sleeping for {sleep_time} seconds before next scan...")
-        time.sleep(sleep_time)
+        # :.0f formats time as a whole number
+        logging.debug(f"Sleeping for {SleepTime:.0f} seconds before next scan.")
+        time.sleep(SleepTime)
 
-# ================================================== ENTRY POINT ====================================== #
+# -- [END] -- #
 
 if __name__ == "__main__":
-    monitor_memory()
+    MemoryMonitor()
