@@ -1,238 +1,268 @@
 # File Integrity Module (`file_integrity.py`)
 
-A cryptographically secure anti-tamper subsystem within the ClearSight Anti-Cheat framework, enforcing file integrity verification, self-integrity protection, baseline hashing, and tamper-aware termination logic. You can view the code [here](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/file_integrity.py).
+The File Integrity Module is a cryptographically enforced anti-tamper subsystem within the **ClearSight Anti-Cheat framework**. Its purpose is to detect unauthorized modification of the anti-cheat itself, game assets, and runtime conditions, then respond with deterministic, logged termination events.
 
-> [!IMPORTANT]
-> This module is designed for **controlled lab and research environments**.  
-> **Code obfuscation**, **packing**, and **anti-reversing countermeasures** are intentionally excluded to keep the system **observable**, **testable**, **auditable**, and **debuggable** for research and detection logic validation.
+This module is designed to be **auditable, research-focused, and deterministic**, prioritizing clarity of logic and cryptographic correctness over adversarial obfuscation.
+
+[Source code](https://github.com/VenalityXT/Anti-Cheat-Project/blob/main/src/file_integrity.py)  
+
+> [!IMPORTANT]  
+> This module is intended for **controlled lab and research environments**.  
+> Anti-reversing techniques such as obfuscation, packing, and virtualization are intentionally excluded to keep the system **observable**, **testable**, and **verifiable** for security research and detection engineering.
 
 ---
 
-## Overview  
+## Overview
 
-The File Integrity Checker performs the following functions:
+The File Integrity Module enforces the following protections:
 
-- Creates an encrypted and digitally signed baseline of known-good file hashes  
-- Verifies baseline integrity using RSA-PSS  
-- Derives its AES-GCM encryption key from RSA private key material (no hardcoded secrets)  
-- Verifies the anti-cheat module’s own integrity using a persistent self-integrity baseline  
-- Detects new, modified, or missing game files  
-- Detects debugger attachment (optional DEV_MODE bypass)  
-- Uses a honeyfile trap to detect broad sweeping tampering  
-- Logs all events using `[INFO]`, `[WARNING]`, `[ERROR]`, and `[CRITICAL]` levels  
+- Self-integrity verification of the anti-cheat module itself
+- Cryptographically signed integrity baselines
+- Recursive file integrity monitoring of the game directory
+- Deterministic AES key derivation without stored secrets
+- Honeyfile tripwire detection
+- Optional debugger detection with development override
+- Structured logging with standardized termination codes
 
-When a validated tamper event is detected, the module triggers a simulated forced game termination recorded under `[CRITICAL]`.
+When a validated tamper condition is detected, the module simulates a forced game termination and records the event under the `[CRITICAL]` log level.
+
+---
+
+## Runtime Control Flow
+
+The File Integrity Module operates across **two conceptual layers**:  
+a high-level enforcement architecture that emphasizes security decisions and failure paths, and a lower-level execution flow that reflects how the logic is implemented in code.
+
+To support both perspectives, the runtime behavior is documented using **two complementary diagrams**.
+
+### High-Level Enforcement Architecture (Conceptual)
+
+The following static flowchart presents a **system-level view** of the module’s runtime behavior. It emphasizes:
+
+- Security boundaries and trust decisions  
+- Validation checkpoints and enforcement gates  
+- Non-recoverable failure paths and termination conditions  
+- The relationship between self-integrity, file-integrity, and monitoring logic  
+
+This diagram is intended to communicate **what the system enforces and why**, rather than the precise order of function calls.
+
+<img width="1770" height="1089" alt="image" src="https://github.com/user-attachments/assets/c011eaff-1c41-41b7-8da2-2c0cd24c7730" />
+
+### Execution Flow (Implementation-Level)
+
+The following Mermaid diagram documents the **runtime execution flow** as implemented in `file_integrity.py`. It focuses on:
+
+- Function sequencing and control flow  
+- Loop structure and execution order  
+- Decision points as they occur during runtime  
+- How enforcement logic is reached in code  
+
+This view is intentionally closer to the implementation and is meant to aid code review, maintenance, and auditability.
 
 ```mermaid
 flowchart LR
-A[Program Start] --> B[Initialize Logging]
-B --> C[Monitor]
+A[Program Start] --> B[Initialize Logging] --> C[Monitor]
 
-C --> D[VerifySelfIntegrity]
-D --> E[ComputeFileHash __file__]
-E --> F{Baseline Exists}
+C --> D[Verify Self Integrity]
+D --> E[Hash file_integrity.py]
+E --> F{Self Baseline Exists}
 
-F -->|No| G[Write Baseline Hash]
-G --> H[Sign Baseline with RSA Private Key]
-H --> I[Return to Monitor]
+F -->|No| G[Create Self Baseline]
+G --> H[Sign Baseline RSA-PSS]
+H --> I[Continue Execution]
 
 F -->|Yes| J{Hash Matches}
 J -->|No| K[Terminate FI-SI-002]
 J -->|Yes| I
 
-I --> L[ScanDirectory Game Directory]
-L --> M[Recursive File Walk]
+I --> L[Initial Directory Scan]
+L --> M[Recursive Walk]
 M --> N[Canonicalize Paths]
-N --> O[Exclude Filter]
-O --> P[Compute SHA-256 Per File]
-P --> Q[Shuffle File Order]
+N --> O[Apply Exclusion Rules]
+O --> P[SHA-256 File Hashing]
+P --> Q[Shuffle Scan Order]
 Q --> R[Baseline Snapshot In Memory]
 
 R --> S[Monitoring Loop]
 
-S --> T{Debugger Present}
+S --> T{Debugger Detected}
 T -->|Yes| U[Terminate FI-DBG-001]
-T -->|No| V[ScanDirectory Game Directory]
+T -->|No| V[Rescan Directory]
 
 V --> W[Current Snapshot]
-W --> X{Baseline Equals Current}
+W --> X{Baseline Matches}
 
 X -->|No| Y[Terminate FI-INT-001]
 X -->|Yes| Z[Sleep With Jitter]
 Z --> S
-
-subgraph Cryptography
-    C1[RSA Private Key File] --> C2[Load RSA Private Key]
-    C2 --> C3[Extract p q d]
-    C3 --> C4[SHA-256 p q d]
-    C4 --> C5[Seed 32 Bytes]
-    C5 --> C6[PBKDF2 HMAC SHA256]
-    C6 --> C7[AES 256 Key]
-
-    C7 --> C8[AES GCM Encrypt JSON]
-    C7 --> C9[AES GCM Decrypt JSON]
-
-    C1 --> C10[RSA PSS Sign Blob]
-    C10 --> C11[Signature Written]
-end
 ```
 
 ---
 
 ## Baseline Architecture
 
-Two independent baselines are maintained:
+The module maintains **two independent integrity baselines**, each with a distinct purpose and threat model.
 
-### 1. Self-Integrity Baseline  
+### Self-Integrity Baseline
 
-Stored as:
+The self-integrity baseline protects the anti-cheat module from modification.
+
+Stored at:
 - `ClearSight/data/baseline/self_integrity.bin`
 - `ClearSight/data/baseline/self_integrity.sig`
 
-This baseline contains a SHA-256 hash of the anti-cheat module itself (`file_integrity.py`).  
-Any mismatch indicates that the anti-cheat has been modified.
+This baseline contains:
+- A SHA-256 hash of `file_integrity.py`
+- An RSA-PSS signature over the hash
 
-### 2. File-Integrity Baseline  
+Any modification to the module source invalidates the baseline and results in immediate termination.
 
-Stored as:
-- `ClearSight/data/hashes.json.enc`  
+### File-Integrity Baseline
+
+The file-integrity baseline protects the monitored game directory.
+
+Stored at:
+- `ClearSight/data/hashes.json.enc`
 - `ClearSight/data/hashes.json.sig`
 
-This baseline contains SHA-256 hashes of game files located inside `GAME_DIRECTORY`, excluding folders and extensions specified in `EXCLUDED_FOLDERS` and `EXCLUDED_EXTENSIONS`.
+This baseline contains:
+- A mapping of `{ absolute_path : sha256_hash }`
+- Encrypted with AES-256-GCM
+- Signed with RSA-PSS
 
-> [!CAUTION]
-> Both baselines must be deleted and regenerated if the monitored file set or directory structure changes.
+Any deviation between current and baseline file state results in a termination event.
+
+> [!CAUTION]  
+> If the monitored directory structure or file set changes legitimately, **both baselines must be deleted and regenerated**.  
 > Failure to do so will result in guaranteed integrity violations.
 
 ---
 
 ## Directory and Path Design
 
-By default:
+The module enforces strict path normalization and separation of concerns.
 
-- `GAME_DIRECTORY` points to the main game folder  
-- The honeyfile is stored at `GAME_DIRECTORY/honeypot.dat`  
-- The self-integrity baseline is stored inside `ClearSight/data/baseline`  
-- The file-integrity baseline is stored inside `ClearSight/data/`  
+Default layout:
+- `GAME_DIRECTORY` contains game assets only
+- `ClearSight/` contains anti-cheat code, keys, logs, and baselines
+- `honeypot.dat` is placed at the root of `GAME_DIRECTORY`
 
-This layout ensures:
-
-- Game assets remain separate from anti-cheat assets  
-- Baseline files cannot be mistaken for regular game content  
-- Paths remain predictable for encryption, signing, and verification logic
+This design ensures:
+- Anti-cheat assets are never confused with game assets
+- Baseline files cannot be mistaken for legitimate game content
+- Canonical paths prevent traversal and duplicate-hash evasion
 
 ---
 
 ## Self-Integrity System
 
-The module protects itself through the following steps:
+The self-integrity mechanism executes on every launch:
 
-1. SHA-256 hashing of the anti-cheat source file  
-2. Storing the hash in `self_integrity.bin`  
-3. Digitally signing the hash using RSA-PSS  
-4. Verifying the signature and current hash on every execution  
+1. Compute SHA-256 hash of `file_integrity.py`
+2. Load the stored self-integrity baseline
+3. Verify the RSA-PSS signature
+4. Compare stored hash to the current hash
 
-If the file has changed:
+If a mismatch is detected:
+- Production mode triggers `[CRITICAL] FI-SI-002`
+- Development mode regenerates the baseline automatically
 
-- In production: `[CRITICAL] FI-SI-002 Anti-cheat module has been modified!`  
-- In DEV_MODE: a warning is logged and the baseline is automatically rebuilt  
+This guarantees that enforcement logic cannot be silently modified.
 
 ---
 
 ## File-Integrity System
 
-The module hashes all valid game files under `GAME_DIRECTORY`.  
-Files are ignored if they appear in:
+The file-integrity system monitors all valid files under `GAME_DIRECTORY`.
 
-- `EXCLUDED_FOLDERS` (e.g., `ClearSight`, `__pycache__`, `.git`)  
-- `EXCLUDED_EXTENSIONS` (e.g., `.tmp`, `.log`, `.cache`)  
+Excluded content:
+- Directories listed in `EXCLUDED_FOLDERS`
+- File extensions listed in `EXCLUDED_EXTENSIONS`
 
-The resulting `{ path: sha256 }` mapping is:
+Process:
+- Files are canonicalized and recursively enumerated
+- SHA-256 hashes are computed per file
+- Scan order is randomized to resist timing-based tampering
+- Results are compared against the decrypted baseline
 
-- Serialized into JSON  
-- Encrypted using AES-256-GCM  
-- Signed using RSA-PSS  
-
-On subsequent runs:
-
-- The baseline signature is verified  
-- The baseline is decrypted  
-- Current file hashes are compared against stored values  
-- Any discrepancy triggers an integrity violation and termination event  
+Any mismatch triggers a termination event.
 
 ---
 
 ## Honeyfile System
 
-A special tripwire file named `honeypot.dat` is placed at the root of `GAME_DIRECTORY`.
+A deliberate tripwire file named `honeypot.dat` is placed in the game directory.
 
 Rules:
+- The game never reads or writes this file
+- The anti-cheat expects the file to exist unchanged
+- Any deletion, modification, or replacement triggers termination
 
-- The game never touches this file  
-- The anti-cheat expects the file to exist and remain unchanged  
-- Deletion, modification, or replacement triggers an integrity violation  
-
-This mechanism rapidly detects mass-editing cheats and automated cleanup tools.
+This mechanism detects mass-modification tools and indiscriminate cleanup attempts.
 
 ---
 
 ## Debugger Detection
 
-The module checks for both:
+The module detects debugging via:
 
-- Python-level debuggers using `sys.gettrace()`  
-- Native Windows debuggers using `IsDebuggerPresent`  
+- Python tracing (`sys.gettrace`)
+- Native Windows debugger checks (`IsDebuggerPresent`)
 
-In production:
+Behavior:
+- Production mode terminates immediately with `FI-DBG-001`
+- Development mode logs a warning and continues execution
 
-`[CRITICAL] [FI-DBG-001] Debugger detected.`
-
-In DEV_MODE:
-
-`[WARNING] Debugger detected, but ignoring because DEV_MODE is enabled.`
-
-> [!WARNING]
-> Debugger detection is intentionally strict and may trigger false positives in advanced development, instrumentation, or monitoring environments.
+> [!WARNING]  
+> Debugger detection may trigger false positives in advanced instrumentation environments.
 
 ---
 
-## AES Key Derivation
+## AES Key Derivation Architecture
 
-To avoid storing plaintext secrets, the AES encryption key is derived directly from RSA private key internals.
+To eliminate static secrets, the AES encryption key is **derived at runtime** from RSA private key material.
 
-Process:
+```mermaid
+flowchart TD
+A[RSA Private Key PEM] --> B[Load Private Key]
+B --> C[Extract 'p', 'q', 'd']
+C --> D[SHA-256 'p', 'q', 'd']
+D --> E[Seed 32 Bytes]
+E --> F[PBKDF2 HMAC SHA256]
+F --> G[AES-256 Key]
 
-1. Load `private_key.pem`  
-2. Extract integer components (`d`, `p`, `q`)  
-3. Hash the components together using SHA-256  
-4. Run PBKDF2-HMAC-SHA256 to derive a 256-bit AES key  
-5. Use AES-GCM with a random 96-bit nonce for encryption and decryption  
+G --> H[AES-GCM Encrypt Baseline]
+G --> I[AES-GCM Decrypt Baseline]
+
+B --> J[RSA-PSS Sign Baseline]
+J --> K[Signature Written]
+```
 
 This design ensures:
-
-- Only the correct private key can decrypt the baseline  
-- Tampering with the key invalidates the entire system  
-- No passwords or static secrets appear in source code or configuration files  
+- No AES keys exist on disk
+- Only the correct private key can decrypt baselines
+- Key tampering invalidates the entire system
 
 ---
 
 ## Logging System
 
-The module uses four severity levels:
+The module uses structured severity levels:
 
-- `[INFO]` — Normal operations  
-- `[WARNING]` — Suspicious or DEV_MODE-bypassed behavior  
-- `[ERROR]` — Non-fatal integrity or configuration issues  
-- `[CRITICAL]` — Guaranteed termination events  
+- `[INFO]` — Normal operation
+- `[WARNING]` — Suspicious but non-fatal behavior
+- `[ERROR]` — Recoverable integrity issues
+- `[CRITICAL]` — Guaranteed termination events
 
-Example `[CRITICAL]` log entry:
+Example critical log entry:
 
-`2025-12-11 12:41:22,118 [FILE_INTEGRITY] [CRITICAL] [FI-INT-001]  
-Terminating simulated game process (PID=4211) — Reason: Integrity violation detected.`
+```text
+2025-12-11 12:41:22,118 [FILE_INTEGRITY] [CRITICAL] [FI-INT-001]
+Terminating simulated game process (PID = 4211) - Reason: Integrity violation detected
+```
 
-All logs are written to:
-
-`ClearSight/logs/file_integrity.log`
+Logs are written to:
+- `ClearSight/logs/file_integrity.log`
 
 Directories are created automatically if missing.
 
@@ -240,42 +270,33 @@ Directories are created automatically if missing.
 
 ## Integrity Violation Codes
 
-| Code         | Meaning |
-|--------------|---------|
-| FI-KEY-001   | Missing RSA private key |
-| FI-SI-001    | Self-integrity signature invalid |
-| FI-SI-002    | Anti-cheat module modified |
-| FI-BL-001    | Baseline signature invalid |
-| FI-BL-002    | Baseline decryption failed |
-| FI-HF-001    | Honeyfile missing or modified |
-| FI-DBG-001   | Debugger detected |
-| FI-INT-001   | Integrity violation detected |
-| FI-INT-002   | Missing game files |
-| FI-INT-003   | Unexpected new files |
+| Code        | Meaning |
+|------------|---------|
+| FI-KEY-001 | Missing RSA private key |
+| FI-SI-001  | Self-integrity signature invalid |
+| FI-SI-002  | Anti-cheat module modified |
+| FI-BL-001  | Baseline signature invalid |
+| FI-BL-002  | Baseline decryption failed |
+| FI-HF-001  | Honeyfile modified or missing |
+| FI-DBG-001 | Debugger detected |
+| FI-INT-001 | Integrity violation detected |
+| FI-INT-002 | Missing game files |
+| FI-INT-003 | Unexpected new files |
 
 ---
 
 ## Development Workflow
 
 During development:
-
-- Set `DEV_MODE = True`  
-- Modify code freely  
-- Baselines regenerate automatically  
-- Debuggers are ignored  
-- Termination events become non-blocking  
+- Enable `DEV_MODE`
+- Baselines regenerate automatically
+- Debugger detection is bypassed
+- Termination events are logged but non-blocking
 
 Before production:
-
-- Disable `DEV_MODE`  
-- Regenerate final baselines  
-- Protect key files and baseline directories from modification  
-
----
-
-## Runtime Flow
-
-<img width="1770" height="1089" alt="image" src="https://github.com/user-attachments/assets/c011eaff-1c41-41b7-8da2-2c0cd24c7730" />
+- Disable `DEV_MODE`
+- Regenerate final baselines
+- Protect key and baseline directories from modification
 
 ---
 
@@ -283,15 +304,13 @@ Before production:
 
 The File Integrity Module provides:
 
-- Cryptographically strong tamper detection  
-- Self-protection against modification  
-- Secure baseline storage  
-- Honeyfile tripwire mechanisms  
-- Debugger awareness  
-- Structured logging with standardized event codes  
+- Deterministic tamper detection
+- Self-protection against modification
+- Cryptographically enforced baselines
+- Runtime debugger awareness
+- Honeyfile-based tripwire detection
+- Structured enforcement and logging
 
-It is designed to be **educational, auditable, and extensible**, with clarity prioritized over adversarial hardening.
-
----
+It is intentionally designed to be **educational, auditable, and extensible**, emphasizing correctness and transparency over adversarial concealment.
 
 End of `docs/file_integrity.md`.
