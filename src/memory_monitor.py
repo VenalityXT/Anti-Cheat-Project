@@ -104,7 +104,7 @@ def CheckMemoryPatterns():
             logging.error(f"Unhandled error while scanning memory: {Error}")
 
 
-def TerminateGame(Event: str, ProcessID: int, Reason: str) -> None:
+def TerminateGame(Event: str, Reason: str, ProcessID: int = -1) -> None:
     logging.critical(
         f"[{Event}] Terminating protected process "
         f"(PID = {ProcessID}) - Reason: {Reason}"
@@ -114,8 +114,9 @@ def TerminateGame(Event: str, ProcessID: int, Reason: str) -> None:
     time.sleep(1.5)
     sys.exit(1)
 
+# -- [MONITOR] -- #
 
-def MemoryMonitor() -> None:
+def Monitor() -> None:
     logging.info("Starting memory monitoring loop")
 
     while True:
@@ -131,7 +132,5 @@ def MemoryMonitor() -> None:
         logging.debug(f"Sleeping for {SleepTime:.0f} seconds before next scan.")
         time.sleep(SleepTime)
 
-# -- [END] -- #
-
 if __name__ == "__main__":
-    MemoryMonitor()
+    Monitor()
