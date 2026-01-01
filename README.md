@@ -96,10 +96,7 @@ Detects unauthorized modifications to critical game files by comparing cryptogra
 ### [Memory Monitor](docs/memory_monitor.md)
 Monitors system memory to detect suspicious patterns indicating code injection or memory tampering.
 
-### [Kernel Monitor](docs/kernel_monitor.md) (Work In Progress)  
-Tracks kernel-level driver activity to identify unauthorized or malicious kernel modules.
-
-### [Process Watcher](docs/process_watcher.md) (Work In Progress)  
+### [Process Watcher](docs/process_watcher.md)
 Watches running processes and flags blacklisted or anomalous behavior indicative of cheat tools.
 
 ### [Input Logger Detector](docs/input_logger_detector.md) (Work In Progress)  
