@@ -99,7 +99,7 @@ Monitors system memory to detect suspicious patterns indicating code injection o
 ### [Process Watcher](docs/process_watcher.md)
 Watches running processes and flags blacklisted or anomalous behavior indicative of cheat tools.
 
-### [Input Logger](docs/input_logger.md) (Work In Progress)  
+### [Input Logger](docs/input_logger.md)
 Detects unusual input patterns or injected inputs that may result from macros or keyloggers.
 
 ### [Network Sniffer Blocker](docs/network_sniffer_blocker.md) (Work In Progress)  
